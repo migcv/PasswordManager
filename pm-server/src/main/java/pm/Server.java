@@ -1,11 +1,12 @@
 package pm;
 import java.rmi.*;
 import java.rmi.server.*;
-import java.security.KeyStore;
+import java.security.Key;
 
 public class Server extends UnicastRemoteObject implements ServerService{
 
 	private static final long serialVersionUID = 1L;
+	
 	
 	protected Server() throws RemoteException {
 		super();
@@ -13,29 +14,22 @@ public class Server extends UnicastRemoteObject implements ServerService{
 	}
 
 
-	public void init(KeyStore ks) throws RemoteException {
+	public void register(Key publicKey) throws RemoteException {
 		// TODO Auto-generated method stub
 		
 	}
 
-	public void register_user() throws RemoteException {
+
+	public void put(Key publicKey, byte[] domain, byte[] username, byte[] password) throws RemoteException {
 		// TODO Auto-generated method stub
 		
 	}
 
-	public void save_password(byte[] domain, byte[] username, byte[] password) throws RemoteException {
-		// TODO Auto-generated method stub
-		
-	}
 
-	public byte[] retrieve_password(byte[] domain, byte[] username) throws RemoteException {
+	public byte[] get(Key publicKey, byte[] domain, byte[] username) throws RemoteException {
 		// TODO Auto-generated method stub
 		return null;
 	}
 
-	public void close() throws RemoteException {
-		// TODO Auto-generated method stub
-		
-	}
 
 }

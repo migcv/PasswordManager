@@ -1,19 +1,17 @@
 package pm;
-import java.rmi.*;
-import java.rmi.server.*;
-import java.security.Key;
-import java.util.Scanner;
+import java.security.KeyStore;
 
 public class Library {
 
-	public void register(Key publicKey){}
+	public void init(KeyStore ks){}
 	
-	public void put(Key publicKey, byte[] domain, byte[] username, byte[] password){}
+	public void register_user(){}
 	
-	public byte[] get(Key publicKey, byte[] domain, byte[] username){
-		
+	public void save_password(byte[] domain, byte[] username, byte[] password){}
+	
+	public byte[] retrieve_password(byte[] domain, byte[] username){
 		return null;
-		
 	}
-
+	
+	public void close(){}
 }
