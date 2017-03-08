@@ -1,5 +1,5 @@
 package pm;
-import java.rmi.*;
+
 import java.rmi.registry.*;
 
 public class ServerMain {
@@ -14,7 +14,7 @@ public class ServerMain {
 			Registry reg = LocateRegistry.createRegistry(registryPort);
 			reg.rebind("ServerService", server);
 			System.out.println("Server ready");
-		}catch (Exception e) {
+		} catch (Exception e) {
 			System.out.println("Server... broke? " + e.getMessage());
 		}
 		

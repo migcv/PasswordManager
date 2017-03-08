@@ -1,34 +1,75 @@
 package pm;
+
 import java.rmi.*;
 import java.rmi.server.*;
 import java.security.Key;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
+
+import pm.exception.DomainOrUsernameDoesntExistException;
+import pm.exception.PublicKeyDoesntExistException;
 
 public class Server extends UnicastRemoteObject implements ServerService{
 
 	private static final long serialVersionUID = 1L;
 	
+	private Map<Key, ArrayList<Triplet>> publicKeyMap = new HashMap<Key, ArrayList<Triplet>>();
 	
 	protected Server() throws RemoteException {
 		super();
-		// TODO Auto-generated constructor stub
 	}
 
 
 	public void register(Key publicKey) throws RemoteException {
-		// TODO Auto-generated method stub
+		
+		publicKeyMap.put(publicKey, new ArrayList<Triplet>());
 		
 	}
 
 
-	public void put(Key publicKey, byte[] domain, byte[] username, byte[] password) throws RemoteException {
-		// TODO Auto-generated method stub
+	public void put(Key publicKey, byte[] domain, byte[] username, byte[] password) throws RemoteException, PublicKeyDoesntExistException {
+		boolean exists = false;
+		ArrayList<Triplet> tripletList = publicKeyMap.get(publicKey);
 		
+		// Verifies if the publicKey exists
+		if(tripletList == null) {
+			throw new PublicKeyDoesntExistException();
+		}
+		
+		for(int i = 0; i < tripletList.size(); i++) {
+			// Verifies if the domain & username exists, if true, replace password with new one
+			if(tripletList.get(i).getDomain().equals(domain) && tripletList.get(i).getUsername().equals(username)) {
+				tripletList.get(i).setPassword(password);
+				exists = true;
+				break;
+			}
+		}
+		// If domain & username doesnt exists, add new triplet (doamin, username, password)
+		if(!exists) {
+			tripletList.add(new Triplet(domain, username, password));
+		}
+		// Put back the list of triplet in the map
+		publicKeyMap.put(publicKey, tripletList);
 	}
 
 
-	public byte[] get(Key publicKey, byte[] domain, byte[] username) throws RemoteException {
-		// TODO Auto-generated method stub
-		return null;
+	public byte[] get(Key publicKey, byte[] domain, byte[] username) throws RemoteException, PublicKeyDoesntExistException, DomainOrUsernameDoesntExistException {
+		ArrayList<Triplet> tripletList = publicKeyMap.get(publicKey);
+		
+		// Verifies if the publicKey exists
+		if(tripletList == null) {
+			throw new PublicKeyDoesntExistException();
+		}
+		
+		for(int i = 0; i < tripletList.size(); i++) {
+			// Verifies if the domain & username exists, if true, sends password
+			if(tripletList.get(i).getDomain().equals(domain) && tripletList.get(i).getUsername().equals(username)) {
+				return tripletList.get(i).getPassword();
+			}
+		}
+		
+		throw new DomainOrUsernameDoesntExistException();
 	}
 
 
