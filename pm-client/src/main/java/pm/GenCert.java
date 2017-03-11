@@ -17,7 +17,7 @@ public class GenCert {
 	// POSSO MUDAR PARA SHA256withRSA?????
 	// POSSO RETIRAR O STATIC????????
 
-	public static X509Certificate[] generateCertificate(KeyPair pair, char[] password, String alias) throws Exception {
+	public X509Certificate[] generateCertificate(KeyPair pair, char[] password, String alias) throws Exception {
 
 		// JCEKS refers the KeyStore implementation from SunJCE provider
 		KeyStore ks = KeyStore.getInstance("JCEKS");

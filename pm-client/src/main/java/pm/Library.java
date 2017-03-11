@@ -6,24 +6,32 @@ import java.security.cert.X509Certificate;
 public class Library {
 
 	public void init(char[] password, String alias, KeyStore... ks) {
-		CreateKey ck = new CreateKey();
+		KeyManagement ck = new KeyManagement();
 		if (ks.length == 0) {
 			try {
 				ck.generateKeyPair(password, alias);
 			} catch (Exception e) {
-				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
 		}
 		
-		ck.verifyKeyStore();
-
+		//Nao sei se isto pode ser assim
+		try {
+			ck.getPublicKey(ks[0], alias, password);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
 	}
 
 	public void register_user() {
+		KeyManagement ck = new KeyManagement();
+		PublicKey pk = ck.getPk();
+		
+		//Nao entendo o que é que eles querem aqui
 	}
 
 	public void save_password(byte[] domain, byte[] username, byte[] password) {
+		// Aqui tem que se fazer a cena da hash e enviar a password encriptada
 	}
 
 	public byte[] retrieve_password(byte[] domain, byte[] username) {
