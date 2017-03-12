@@ -8,9 +8,8 @@ import java.io.FileOutputStream;
 
 public class KeyManagement {
 
-	//Tenho de repensar isto, porque para varios utilizadores ao mesmo tempo nao funciona
-	//ArrayList<PublicKey> pkList = new ArrayList<PublicKey>();
-	protected PublicKey pk;
+	private PublicKey publicK;
+	private PrivateKey privateK;
 
 	public void generateKeyPair(char[] password, String alias) throws Exception {
 
@@ -19,14 +18,14 @@ public class KeyManagement {
 		keyGen.initialize(2048);
 		KeyPair keypair = keyGen.genKeyPair();
 
-		// PrivateKey privateKey = keypair.getPrivate();
-		// PublicKey publicKey = keypair.getPublic();
+		privateK = keypair.getPrivate();
+		publicK = keypair.getPublic();
 
 		new GenCert().generateCertificate(keypair, password, alias);
 
 	}
 
-	public void getPublicKey(KeyStore ks, String alias, char[] password) throws Exception{
+	public void getKeys(KeyStore ks, String alias, char[] password) throws Exception{
 		
 		//Open the KeyStore file
 		FileInputStream fis = new FileInputStream("keystorefile.jce");
@@ -37,11 +36,19 @@ public class KeyManagement {
 		fis.close();
 		//Get the key with the given alias.
 		//Key k = ks.getKey(alias, password);
-		pk = ks.getCertificate(alias).getPublicKey();
+		publicK = ks.getCertificate(alias).getPublicKey();
+		Key k = ks.getKey(alias, password);
+	    if (k instanceof PrivateKey) {
+	    	privateK = (PrivateKey) k;
+	    }
 	}
 	
-	public PublicKey getPk() {
-		return pk;
+	public PublicKey getPublicK() {
+		return publicK;
+	}
+	
+	public PrivateKey getPrivateK() {
+		return privateK;
 	}
 
 }

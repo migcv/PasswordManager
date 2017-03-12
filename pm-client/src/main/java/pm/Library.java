@@ -41,7 +41,7 @@ public class Library {
 		}
 		else {
 			try {
-				ck.getPublicKey(ks[0], alias, password);
+				ck.getKeys(ks[0], alias, password);
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
@@ -51,7 +51,7 @@ public class Library {
 	public void register_user() {
 		
 		try {
-			server.register(ck.getPk());
+			server.register(ck.getPublicK());
 		} catch (RemoteException e) {
 			e.printStackTrace();
 		}
@@ -61,7 +61,7 @@ public class Library {
 	public void save_password(byte[] domain, byte[] username, byte[] password) {
 		
 		try {
-			server.put(ck.getPk(), domain, username, password);
+			server.put(ck.getPublicK(), domain, username, password);
 		} catch (RemoteException e) {
 			e.printStackTrace();
 		}
@@ -70,7 +70,7 @@ public class Library {
 	public byte[] retrieve_password(byte[] domain, byte[] username) {
 		byte[] password = null;
 		try {
-			 password = server.get(ck.getPk(), domain, username);
+			 password = server.get(ck.getPublicK(), domain, username);
 		} catch (RemoteException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
