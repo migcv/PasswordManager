@@ -14,7 +14,7 @@
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <mainclass>pm.Client</mainclass>
-    <version.jmockit>1.16</version.jmockit>
+    <version.jmockit>1.30</version.jmockit>
 	<version.junit>4.12</version.junit>
   </properties>
 
