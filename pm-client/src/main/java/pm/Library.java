@@ -64,12 +64,21 @@ public class Library {
 	public void save_password(byte[] domain, byte[] username, byte[] password) {
 		PublicKey pk = ck.getPublicK();
 		byte[] passEncryp = null;
+		byte[] domainHash = null;
+		byte[] usernameHash = null;
 
 		try {
+			
+			//Cipher Password
 			Cipher cipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding");
 			cipher.init(Cipher.ENCRYPT_MODE, pk);
 			passEncryp = cipher.doFinal(password);
-			server.put(ck.getPublicK(), domain, username, passEncryp);
+			
+			domainHash = ck.digest(domain);
+			usernameHash = ck.digest(username);
+			
+			server.put(ck.getPublicK(), domainHash, usernameHash, passEncryp);
+			
 		} catch (RemoteException e) {
 			e.printStackTrace();
 		} catch (InvalidKeyException e) {
@@ -86,14 +95,21 @@ public class Library {
 	}
 
 	public byte[] retrieve_password(byte[] domain, byte[] username) {
-		byte[] passwordEncryp = null;
+		byte[] passwordDecryp = null;
 		byte[] password = null;
+		byte[] domainHash = null;
+		byte[] usernameHash = null;
+		
 		try {
 
 			Cipher cipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding");
 			cipher.init(Cipher.DECRYPT_MODE, ck.getPrivateK());
-			passwordEncryp = server.get(ck.getPublicK(), domain, username);
-			password = cipher.doFinal(passwordEncryp);
+			
+			domainHash = ck.digest(domain);
+			usernameHash = ck.digest(username);
+			
+			passwordDecryp = server.get(ck.getPublicK(), domainHash, usernameHash);
+			password = cipher.doFinal(passwordDecryp);
 
 		} catch (RemoteException e) {
 			e.printStackTrace();

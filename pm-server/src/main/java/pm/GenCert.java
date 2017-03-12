@@ -12,8 +12,6 @@ import java.io.FileOutputStream;
  */
 public class GenCert {
 
-	// POSSO MUDAR PARA SHA256withRSA?????
-	// POSSO RETIRAR O STATIC????????
 
 	public X509Certificate[] generateCertificate(KeyPair pair, char[] password, String alias) throws Exception {
 
@@ -39,11 +37,11 @@ public class GenCert {
 		AlgorithmId algo = new AlgorithmId(AlgorithmId.md5WithRSAEncryption_oid);
 		info.set(X509CertInfo.ALGORITHM_ID, new CertificateAlgorithmId(algo));
 		X509CertImpl cert = new X509CertImpl(info);
-		cert.sign(pair.getPrivate(), "SHA1withRSA");
+		cert.sign(pair.getPrivate(), "SHA256withRSA");
 		algo = (AlgorithmId) cert.get(X509CertImpl.SIG_ALG);
 		info.set(CertificateAlgorithmId.NAME + "." + CertificateAlgorithmId.ALGORITHM, algo);
 		cert = new X509CertImpl(info);
-		cert.sign(keypair.getPrivate(), "SHA1withRSA");
+		cert.sign(keypair.getPrivate(), "SHA256withRSA");
 
 		return new X509Certificate[] { cert };
 	}

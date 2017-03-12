@@ -14,8 +14,6 @@ import java.io.FileOutputStream;
  */
 public class GenCert {
 
-	// POSSO MUDAR PARA SHA256withRSA?????
-	// POSSO RETIRAR O STATIC????????
 
 	public X509Certificate[] generateCertificate(KeyPair pair, char[] password, String alias) throws Exception {
 

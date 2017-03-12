@@ -50,5 +50,12 @@ public class KeyManagement {
 	public PrivateKey getPrivateK() {
 		return privateK;
 	}
+	
+	public byte[] digest(byte[] message) throws NoSuchAlgorithmException{
+		MessageDigest sha = MessageDigest.getInstance("SHA-256");
+		sha.update(message);
+		return sha.digest();
+		
+	}
 
 }
