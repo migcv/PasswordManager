@@ -11,6 +11,9 @@ public class Client {
 		Library c = new Library();
 		c.init("password".toCharArray(), "alias");
 		c.register_user();
+		c.save_password("www.google.com".getBytes(), "Miguel".getBytes(), "Macaco".getBytes());
+		c.retrieve_password("www.google.com".getBytes(), "Miguel".getBytes());
+		c.close();
 
 		// c.playGame(server);
 		// c.congratulate();
