@@ -66,7 +66,7 @@ public class Library {
 		byte[] passEncryp = null;
 
 		try {
-			Cipher cipher = Cipher.getInstance("RSA/CBC/PKCS5Padding");
+			Cipher cipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding");
 			cipher.init(Cipher.ENCRYPT_MODE, pk);
 			passEncryp = cipher.doFinal(password);
 			server.put(ck.getPublicK(), domain, username, passEncryp);
@@ -90,7 +90,7 @@ public class Library {
 		byte[] password = null;
 		try {
 
-			Cipher cipher = Cipher.getInstance("RSA/CBC/PKCS5Padding");
+			Cipher cipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding");
 			cipher.init(Cipher.DECRYPT_MODE, ck.getPrivateK());
 			passwordEncryp = server.get(ck.getPublicK(), domain, username);
 			password = cipher.doFinal(passwordEncryp);

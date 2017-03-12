@@ -41,11 +41,11 @@ public class GenCert {
 		AlgorithmId algo = new AlgorithmId(AlgorithmId.md5WithRSAEncryption_oid);
 		info.set(X509CertInfo.ALGORITHM_ID, new CertificateAlgorithmId(algo));
 		X509CertImpl cert = new X509CertImpl(info);
-		cert.sign(pair.getPrivate(), "SHA1withRSA");
+		cert.sign(pair.getPrivate(), "SHA256withRSA");
 		algo = (AlgorithmId) cert.get(X509CertImpl.SIG_ALG);
 		info.set(CertificateAlgorithmId.NAME + "." + CertificateAlgorithmId.ALGORITHM, algo);
 		cert = new X509CertImpl(info);
-		cert.sign(pair.getPrivate(), "SHA1withRSA");
+		cert.sign(pair.getPrivate(), "SHA256withRSA");
 
 		////////////////////////////////////////////////////////////////////////////////////////////////////
 
