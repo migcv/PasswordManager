@@ -55,7 +55,7 @@ public class KeyManagement {
 		MessageDigest sha = MessageDigest.getInstance("SHA-256");
 		sha.update(message);
 		return sha.digest();
-		
 	}
+	
 
 }
