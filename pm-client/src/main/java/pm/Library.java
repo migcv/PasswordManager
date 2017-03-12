@@ -15,34 +15,20 @@ public class Library {
 	private ServerService server = null;
 	private KeyManagement ck = new KeyManagement();
 
-	private void connectToServer() {
-		if (System.getSecurityManager() == null) {
-			System.setSecurityManager(new SecurityManager());
-		} else
-			System.out.println("Já tem um cenas");
-
-		try {
-
-			server = (ServerService) Naming.lookup("//localhost:10000/ServerService");
-			System.out.println("Encontrou o servidor");
-
-		} catch (Exception e) {
-			System.out.println("Houve problemas: " + e.getMessage());
-		}
-
-	}
-
 	public void init(char[] password, String alias, KeyStore... ks) {
-
+		
+		// Initializes a connection to the Server
 		connectToServer();
-
+		// Generate a new key pair
 		if (ks.length == 0) {
 			try {
 				ck.generateKeyPair(password, alias);
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
-		} else {
+		} 
+		// Extracts the key pair
+		else {
 			try {
 				ck.getKeys(ks[0], alias, password);
 			} catch (Exception e) {
@@ -62,24 +48,21 @@ public class Library {
 	}
 
 	public void save_password(byte[] domain, byte[] username, byte[] password) {
-		PublicKey pk = ck.getPublicK();
-		byte[] passEncryp = null;
-		byte[] domainHash = null;
-		byte[] usernameHash = null;
+		
+		byte[] passEncryp = null, domainHash = null, usernameHash = null;
 
 		try {
-			
-			//Cipher Password
+			// Cipher Password with Public Key
 			Cipher cipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding");
-			cipher.init(Cipher.ENCRYPT_MODE, pk);
+			cipher.init(Cipher.ENCRYPT_MODE, ck.getPublicK());
 			passEncryp = cipher.doFinal(password);
-			
+			// Digest of Domain and Username
 			domainHash = ck.digest(domain);
 			usernameHash = ck.digest(username);
+			// Signature of all data, H(domain), H(username) & E(password)
+			byte[] signature = ck.signature(domainHash, usernameHash, passEncryp);
 			
-			ck.signature(domainHash, usernameHash, passEncryp);
-			
-			server.put(ck.getPublicK(), domainHash, usernameHash, passEncryp);
+			server.put(ck.getPublicK(), domainHash, usernameHash, passEncryp, signature);
 			
 		} catch (RemoteException e) {
 			e.printStackTrace();
@@ -99,23 +82,23 @@ public class Library {
 	}
 
 	public byte[] retrieve_password(byte[] domain, byte[] username) {
-		byte[] passwordDecryp = null;
-		byte[] password = null;
-		byte[] domainHash = null;
-		byte[] usernameHash = null;
+		
+		byte[] password = null, domainHash = null, usernameHash = null;
+		byte[] passwordEncrypted = null;
 		
 		try {
-
-			Cipher cipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding");
-			cipher.init(Cipher.DECRYPT_MODE, ck.getPrivateK());
-			
+			// Digest of Domain and Username
 			domainHash = ck.digest(domain);
 			usernameHash = ck.digest(username);
+			// Signature of all data, H(domain), H(username)
+			byte[] signature = ck.signature(domainHash, usernameHash);
 			
-			ck.signature(domainHash, usernameHash);
+			passwordEncrypted = server.get(ck.getPublicK(), domainHash, usernameHash, signature);
 			
-			passwordDecryp = server.get(ck.getPublicK(), domainHash, usernameHash);
-			password = cipher.doFinal(passwordDecryp);
+			// Dipher Password with Private Key
+			Cipher cipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding");
+			cipher.init(Cipher.DECRYPT_MODE, ck.getPrivateK());
+			password = cipher.doFinal(passwordEncrypted);
 
 		} catch (RemoteException e) {
 			e.printStackTrace();
@@ -142,6 +125,19 @@ public class Library {
 		// automatically.
 		// RMI's TCP connections are managed invisibly under the hood.
 		// Just let the stub be garbage-collected.
+	}
+	
+	private void connectToServer() {
+		if (System.getSecurityManager() == null) {
+			System.setSecurityManager(new SecurityManager());
+		}
+		try {
+			server = (ServerService) Naming.lookup("//localhost:10000/ServerService");
+			System.out.println("Server found!");
+
+		} catch (Exception e) {
+			System.out.println("Ups...something is wrong: " + e.getMessage());
+		}
 	}
 
 }
