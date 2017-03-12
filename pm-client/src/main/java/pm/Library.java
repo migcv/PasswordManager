@@ -77,6 +77,8 @@ public class Library {
 			domainHash = ck.digest(domain);
 			usernameHash = ck.digest(username);
 			
+			ck.signature(domainHash, usernameHash, passEncryp);
+			
 			server.put(ck.getPublicK(), domainHash, usernameHash, passEncryp);
 			
 		} catch (RemoteException e) {
@@ -90,6 +92,8 @@ public class Library {
 		} catch (NoSuchAlgorithmException e) {
 			e.printStackTrace();
 		} catch (NoSuchPaddingException e) {
+			e.printStackTrace();
+		} catch (SignatureException e) {
 			e.printStackTrace();
 		}
 	}
@@ -108,6 +112,8 @@ public class Library {
 			domainHash = ck.digest(domain);
 			usernameHash = ck.digest(username);
 			
+			ck.signature(domainHash, usernameHash);
+			
 			passwordDecryp = server.get(ck.getPublicK(), domainHash, usernameHash);
 			password = cipher.doFinal(passwordDecryp);
 
@@ -122,6 +128,8 @@ public class Library {
 		} catch (NoSuchPaddingException e) {
 			e.printStackTrace();
 		} catch (InvalidKeyException e) {
+			e.printStackTrace();
+		} catch (SignatureException e) {
 			e.printStackTrace();
 		}
 		return password;

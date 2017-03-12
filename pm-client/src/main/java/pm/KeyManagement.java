@@ -25,37 +25,67 @@ public class KeyManagement {
 
 	}
 
-	public void getKeys(KeyStore ks, String alias, char[] password) throws Exception{
-		
-		//Open the KeyStore file
+	public void getKeys(KeyStore ks, String alias, char[] password) throws Exception {
+
+		// Open the KeyStore file
 		FileInputStream fis = new FileInputStream("keystorefile.jce");
-		//Create an instance of KeyStore of type “JCEKS” 
+		// Create an instance of KeyStore of type “JCEKS”
 		ks = KeyStore.getInstance("JCEKS");
-		//Load the key entries from the file into the KeyStore object.
-		ks.load(fis, password); 
+		// Load the key entries from the file into the KeyStore object.
+		ks.load(fis, password);
 		fis.close();
-		//Get the key with the given alias.
-		//Key k = ks.getKey(alias, password);
+		// Get the key with the given alias.
+		// Key k = ks.getKey(alias, password);
 		publicK = ks.getCertificate(alias).getPublicKey();
 		Key k = ks.getKey(alias, password);
-	    if (k instanceof PrivateKey) {
-	    	privateK = (PrivateKey) k;
-	    }
+		if (k instanceof PrivateKey) {
+			privateK = (PrivateKey) k;
+		}
 	}
-	
+
 	public PublicKey getPublicK() {
 		return publicK;
 	}
-	
+
 	public PrivateKey getPrivateK() {
 		return privateK;
 	}
-	
-	public byte[] digest(byte[] message) throws NoSuchAlgorithmException{
+
+	public byte[] digest(byte[] message) throws NoSuchAlgorithmException {
 		MessageDigest sha = MessageDigest.getInstance("SHA-256");
 		sha.update(message);
 		return sha.digest();
 	}
-	
+
+	public byte[] signature(byte[]... arrays) throws NoSuchAlgorithmException, InvalidKeyException, SignatureException {
+
+		byte[] toSend = concat(arrays);
+
+		Signature rsaForSign = Signature.getInstance("SHA256withRSA");
+		rsaForSign.initSign(privateK);
+		rsaForSign.update(toSend);
+		byte[] signature = rsaForSign.sign();
+		return signature;
+	}
+
+	static byte[] concat(byte[]... arrays) {
+		// Determine the length of the result array
+		int totalLength = 0;
+		for (int i = 0; i < arrays.length; i++) {
+			totalLength += arrays[i].length;
+		}
+
+		// create the result array
+		byte[] result = new byte[totalLength];
+
+		// copy the source arrays into the result array
+		int currentIndex = 0;
+		for (int i = 0; i < arrays.length; i++) {
+			System.arraycopy(arrays[i], 0, result, currentIndex, arrays[i].length);
+			currentIndex += arrays[i].length;
+		}
+
+		return result;
+	}
 
 }
