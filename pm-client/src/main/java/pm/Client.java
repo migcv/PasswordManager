@@ -6,7 +6,7 @@ import pm.ServerService;
 
 public class Client {
 
-	/*public static void main(String[] args) throws Exception {
+public static void main(String[] args) throws Exception {
     	
     	if (System.getSecurityManager() == null) {
     		System.setSecurityManager(new SecurityManager());
@@ -22,13 +22,16 @@ public class Client {
     		
     		Library c = new Library();
     		c.init("password".toCharArray(), "alias");
+    		c.register_user(server);
+    		
+    		
     		//c.playGame(server);
     		//c.congratulate();
     		
     	} catch (Exception e) {
     		System.out.println("Houve problemas: " + e.getMessage());
     	}
-    	  /* TO DO 
-    }*/
+    	
+    }
 
 }
