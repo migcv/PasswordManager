@@ -1,9 +1,11 @@
 package pm;
 
+import java.io.UnsupportedEncodingException;
 import java.rmi.*;
 import java.rmi.server.*;
 import java.security.Key;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -51,6 +53,13 @@ public class Server extends UnicastRemoteObject implements ServerService{
 		}
 		// Put back the list of triplet in the map
 		publicKeyMap.put(publicKey, tripletList);
+		try {
+			System.out.println(new String(publicKeyMap.get(publicKey).get(0).getDomain(), "UTF-8"));
+			System.out.println(new String(publicKeyMap.get(publicKey).get(0).getUsername(), "UTF-8"));
+			System.out.println(new String(publicKeyMap.get(publicKey).get(0).getPassword(), "UTF-8"));
+		} catch (UnsupportedEncodingException e) {
+			e.printStackTrace();
+		}
 	}
 
 
@@ -64,7 +73,14 @@ public class Server extends UnicastRemoteObject implements ServerService{
 		
 		for(int i = 0; i < tripletList.size(); i++) {
 			// Verifies if the domain & username exists, if true, sends password
-			if(tripletList.get(i).getDomain().equals(domain) && tripletList.get(i).getUsername().equals(username)) {
+			try {
+				System.out.println(new String(tripletList.get(i).getDomain(), "UTF-8"));
+				System.out.println(new String(tripletList.get(i).getUsername(), "UTF-8"));
+			}
+			catch (UnsupportedEncodingException e) {
+				e.printStackTrace();
+			}
+			if(Arrays.equals(tripletList.get(i).getDomain(), domain) && Arrays.equals(tripletList.get(i).getUsername(), username)) {
 				return tripletList.get(i).getPassword();
 			}
 		}

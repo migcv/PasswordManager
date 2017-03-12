@@ -39,11 +39,12 @@ public class Library {
 				e.printStackTrace();
 			}
 		}
-		
-		try {
-			ck.getPublicKey(ks[0], alias, password);
-		} catch (Exception e) {
-			e.printStackTrace();
+		else {
+			try {
+				ck.getPublicKey(ks[0], alias, password);
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
 		}
 	}
 
