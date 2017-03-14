@@ -140,6 +140,29 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 			throw new SignatureWrongException();
 		}
 		
+		byte[] domainDeciphered = null, usernameDeciphered = null;
+		
+		// Decipher content
+		try {
+			IvParameterSpec ivspec = new IvParameterSpec(iv);
+			Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+			cipher.init(Cipher.DECRYPT_MODE, sessionKeyMap.get(publicKey), ivspec);
+			domainDeciphered = cipher.doFinal(domain);
+			usernameDeciphered = cipher.doFinal(username);
+		} catch (IllegalBlockSizeException e) {
+			e.printStackTrace();
+		} catch (BadPaddingException e) {
+			e.printStackTrace();
+		} catch (InvalidKeyException e) {
+			e.printStackTrace();
+		} catch (InvalidAlgorithmParameterException e) {
+			e.printStackTrace();
+		} catch (NoSuchAlgorithmException e) {
+			e.printStackTrace();
+		} catch (NoSuchPaddingException e) {
+			e.printStackTrace();
+		}
+		
 		byte[] passwordCiphered = null;
 		ArrayList<Triplet> tripletList = publicKeyMap.get(publicKey);
 
@@ -150,11 +173,17 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 
 		for (int i = 0; i < tripletList.size(); i++) {
 			// Verifies if the domain & username exists, if true, sends password
-			if (Arrays.equals(tripletList.get(i).getDomain(), domain)
-					&& Arrays.equals(tripletList.get(i).getUsername(), username)) {
+			if (Arrays.equals(tripletList.get(i).getDomain(), domainDeciphered)
+					&& Arrays.equals(tripletList.get(i).getUsername(), usernameDeciphered)) {
 				
 				try {
-				    IvParameterSpec ivspec = new IvParameterSpec(iv);
+					// Generate a random IV
+					SecureRandom random = new SecureRandom();
+					byte[] res_iv = new byte[16];
+					random.nextBytes(iv);
+				    IvParameterSpec ivspec = new IvParameterSpec(res_iv);
+				    
+				    // Cipher password with session key
 					Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
 					cipher.init(Cipher.ENCRYPT_MODE, sessionKeyMap.get(publicKey), ivspec);
 					passwordCiphered = cipher.doFinal(tripletList.get(i).getPassword());
@@ -172,9 +201,11 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 					e.printStackTrace();
 				}
 				
+				// Create List to send with <password_ciphered, iv>
 				ArrayList<byte[]> res = new ArrayList<byte[]>();
 				res.add(passwordCiphered);
 				res.add(iv);
+				
 				return res;
 			}
 		}

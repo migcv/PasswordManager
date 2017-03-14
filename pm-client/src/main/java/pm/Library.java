@@ -82,7 +82,7 @@ public class Library {
 		try {
 
 			// Cipher Password with Public Key
-			Cipher cipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding");
+			Cipher cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
 			cipher.init(Cipher.ENCRYPT_MODE, ck.getPublicK());
 			aux = cipher.doFinal(password);
 
@@ -166,7 +166,7 @@ public class Library {
 			aux = firstDecipher.doFinal(passwordCipher);
 
 			// Decipher Password with Private Key
-			Cipher decipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding");
+			Cipher decipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
 			decipher.init(Cipher.DECRYPT_MODE, ck.getPrivateK());
 			password = decipher.doFinal(aux);
 
