@@ -136,7 +136,7 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 	public ArrayList<byte[]> get(Key publicKey, byte[] domain, byte[] username, byte[] iv, byte[] signature) throws RemoteException,
 			PublicKeyDoesntExistException, DomainOrUsernameDoesntExistException, SignatureWrongException {
 		// Verify Signature
-		if (!verifySignatue(publicKey, signature, domain, username, iv)) {
+		if (!verifySignatue(publicKey, signature, domain, username)) {
 			throw new SignatureWrongException();
 		}
 		

@@ -131,22 +131,31 @@ public class Library {
 	public byte[] retrieve_password(byte[] domain, byte[] username) {
 
 		byte[] password = null, domainHash = null, usernameHash = null, aux = null;
-		ArrayList<byte[]> passwordEncrypted = new ArrayList<byte[]>();
+		ArrayList<byte[]> data = new ArrayList<byte[]>();
 
 		try {
+			SecureRandom random = new SecureRandom();
+			byte[] iv = new byte[16];
+			random.nextBytes(iv);
+			IvParameterSpec ivspec = new IvParameterSpec(iv);
+			
 			// Digest of Domain and Username
 			domainHash = ck.digest(domain);
 			usernameHash = ck.digest(username);
 			// Signature of all data, H(domain), H(username)
 			byte[] signature = ck.signature(domainHash, usernameHash);
 
-			passwordEncrypted = server.get(ck.getPublicK(), domainHash, usernameHash, signature);
+			data = server.get(ck.getPublicK(), domainHash, usernameHash, iv, signature);
 
 			// Decipher with Session Key
-
+			byte[] passwordCipher = data.get(0);
+			iv = data.get(1);
+			
+			ivspec = new IvParameterSpec(iv);
+			
 			Cipher firstCipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
 			firstCipher.init(Cipher.DECRYPT_MODE, sessionKey, ivspec);
-			aux = firstCipher.doFinal(passwordEncrypted);
+			aux = firstCipher.doFinal(passwordCipher);
 
 			// Decipher Password with Private Key
 			Cipher cipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding");
