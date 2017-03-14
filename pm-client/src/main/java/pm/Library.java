@@ -9,12 +9,14 @@ import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.NoSuchPaddingException;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.SecretKeySpec;
 
 public class Library {
 
 	private ServerService server = null;
 	private KeyManagement ck = new KeyManagement();
-	private Key sessionKey = null;
+	private SecretKey sessionKey = null;
 
 	public void init(char[] password, String alias, KeyStore... ks) {
 		
@@ -38,7 +40,13 @@ public class Library {
 		}
 		
 		try {
-			sessionKey = server.init(ck.getPublicK());
+			
+			byte[] sessionKeyEncryp = server.init(ck.getPublicK());
+			Cipher cipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding");
+			cipher.init(Cipher.DECRYPT_MODE, ck.getPrivateK());
+			byte[] aux = cipher.doFinal(sessionKeyEncryp);
+			sessionKey = new SecretKeySpec(aux, 0, aux.length, "AES");
+			
 		} catch (RemoteException e) {
 			e.printStackTrace();
 		}
