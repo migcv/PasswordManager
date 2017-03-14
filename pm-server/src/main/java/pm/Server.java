@@ -80,7 +80,7 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 		}
 		// Put back the list of triplet in the map
 		publicKeyMap.put(publicKey, tripletList);
-		saveState();
+		//saveState();
 	}
 
 	public byte[] get(Key publicKey, byte[] domain, byte[] username, byte[] signature) throws RemoteException,
@@ -108,7 +108,7 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 		throw new DomainOrUsernameDoesntExistException();
 	}
 
-	// Generate a session key (NOT USED YET)
+	// Generate a session key
 	private Key createSessionKey() {
 		KeyGenerator keyGenerator;
 		Key key = null;
@@ -119,6 +119,7 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 		} catch (NoSuchAlgorithmException e) {
 			e.printStackTrace();
 		}
+		System.out.println(key.toString());
 		return key;
 	}
 

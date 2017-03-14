@@ -14,7 +14,7 @@ public class Library {
 
 	private ServerService server = null;
 	private KeyManagement ck = new KeyManagement();
-	private Key sessionKey;
+	private Key sessionKey = null;
 
 	public void init(char[] password, String alias, KeyStore... ks) {
 		
@@ -38,7 +38,7 @@ public class Library {
 		}
 		
 		try {
-			sessionKey = server.init(ck.getPrivateK());
+			sessionKey = server.init(ck.getPublicK());
 		} catch (RemoteException e) {
 			e.printStackTrace();
 		}
@@ -141,7 +141,6 @@ public class Library {
 		try {
 			server = (ServerService) Naming.lookup("//localhost:10000/ServerService");
 			System.out.println("Server found!");
-
 		} catch (Exception e) {
 			System.out.println("Ups...something is wrong: " + e.getMessage());
 		}
