@@ -4,6 +4,8 @@ import java.rmi.*;
 import java.security.Key;
 
 public interface ServerService extends Remote {
+	
+	public Key init(Key publicKey) throws RemoteException;
 
 	public void register(Key publicKey) throws RemoteException;
 	
