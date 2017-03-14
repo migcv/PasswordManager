@@ -44,9 +44,9 @@ public class Library {
 		try {
 			byte[] sessionKeyEncryp = server.init(ck.getPublicK());
 
-			Cipher cipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding");
-			cipher.init(Cipher.DECRYPT_MODE, ck.getPrivateK());
-			byte[] aux = cipher.doFinal(sessionKeyEncryp);
+			Cipher decipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding");
+			decipher.init(Cipher.DECRYPT_MODE, ck.getPrivateK());
+			byte[] aux = decipher.doFinal(sessionKeyEncryp);
 
 			sessionKey = new SecretKeySpec(aux, 0, aux.length, "AES");
 		} catch (RemoteException e) {
@@ -99,15 +99,16 @@ public class Library {
 			// Digest of Domain and Username
 			domainHash = ck.digest(domain);
 			usernameHash = ck.digest(username);
-			
-			// Signature of all data, E( H(domain)), E( H(username)) & E(password)
+
+			// Signature of all data, E( H(domain)), E( H(username)) &
+			// E(password)
 
 			domainEncry = firstCipher.doFinal(domainHash);
 			usernameEncry = firstCipher.doFinal(usernameHash);
 
 			byte[] signature = ck.signature(domainEncry, usernameEncry, passEncryp);
 
-			server.put(ck.getPublicK(), domainEncry, usernameEncry, passEncryp, iv ,signature);
+			server.put(ck.getPublicK(), domainEncry, usernameEncry, passEncryp, iv, signature);
 
 		} catch (RemoteException e) {
 			e.printStackTrace();
@@ -130,7 +131,7 @@ public class Library {
 
 	public byte[] retrieve_password(byte[] domain, byte[] username) {
 
-		byte[] password = null, domainHash = null, usernameHash = null, aux = null;
+		byte[] password = null, domainHash = null, usernameHash = null, aux = null, domainEncryp = null, usernameEncryp = null;
 		ArrayList<byte[]> data = new ArrayList<byte[]>();
 
 		try {
@@ -139,13 +140,20 @@ public class Library {
 			random.nextBytes(iv);
 			IvParameterSpec ivspec = new IvParameterSpec(iv);
 			
+			Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+			cipher.init(Cipher.ENCRYPT_MODE, sessionKey, ivspec);
+			
+			
 			// Digest of Domain and Username
 			domainHash = ck.digest(domain);
 			usernameHash = ck.digest(username);
-			// Signature of all data, H(domain), H(username)
-			byte[] signature = ck.signature(domainHash, usernameHash);
+			
+			domainEncryp = cipher.doFinal(domainHash);
+			usernameEncryp = cipher.doFinal(usernameHash);
+			// Signature of all data, E( H(domain)), E( H(username))
+			byte[] signature = ck.signature(domainEncryp, usernameEncryp);
 
-			data = server.get(ck.getPublicK(), domainHash, usernameHash, iv, signature);
+			data = server.get(ck.getPublicK(), domainEncryp, usernameEncryp, iv, signature);
 
 			// Decipher with Session Key
 			byte[] passwordCipher = data.get(0);
@@ -153,14 +161,14 @@ public class Library {
 			
 			ivspec = new IvParameterSpec(iv);
 			
-			Cipher firstCipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-			firstCipher.init(Cipher.DECRYPT_MODE, sessionKey, ivspec);
-			aux = firstCipher.doFinal(passwordCipher);
+			Cipher firstDecipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+			firstDecipher.init(Cipher.DECRYPT_MODE, sessionKey, ivspec);
+			aux = firstDecipher.doFinal(passwordCipher);
 
 			// Decipher Password with Private Key
-			Cipher cipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding");
-			cipher.init(Cipher.DECRYPT_MODE, ck.getPrivateK());
-			password = cipher.doFinal(aux);
+			Cipher decipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding");
+			decipher.init(Cipher.DECRYPT_MODE, ck.getPrivateK());
+			password = decipher.doFinal(aux);
 
 		} catch (RemoteException e) {
 			e.printStackTrace();
