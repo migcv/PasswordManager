@@ -84,6 +84,7 @@ public class Library {
 			Cipher cipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding");
 			cipher.init(Cipher.ENCRYPT_MODE, ck.getPublicK());
 			passEncryp = cipher.doFinal(password);
+			
 			// Digest of Domain and Username
 			domainHash = ck.digest(domain);
 			usernameHash = ck.digest(username);
@@ -111,7 +112,7 @@ public class Library {
 
 	public byte[] retrieve_password(byte[] domain, byte[] username) {
 		
-		byte[] password = null, domainHash = null, usernameHash = null;
+		byte[] password = null, domainHash = null, usernameHash = null, aux = null;
 		byte[] passwordEncrypted = null;
 		
 		try {
@@ -123,10 +124,15 @@ public class Library {
 			
 			passwordEncrypted = server.get(ck.getPublicK(), domainHash, usernameHash, signature);
 			
-			// Dipher Password with Private Key
+			// Decipher with Session Key
+			Cipher firstCipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+			firstCipher.init(Cipher.DECRYPT_MODE, sessionKey);
+			aux = firstCipher.doFinal(passwordEncrypted);
+			
+			// Decipher Password with Private Key
 			Cipher cipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding");
 			cipher.init(Cipher.DECRYPT_MODE, ck.getPrivateK());
-			password = cipher.doFinal(passwordEncrypted);
+			password = cipher.doFinal(aux);
 
 		} catch (RemoteException e) {
 			e.printStackTrace();
