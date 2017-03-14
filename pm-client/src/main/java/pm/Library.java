@@ -14,6 +14,7 @@ public class Library {
 
 	private ServerService server = null;
 	private KeyManagement ck = new KeyManagement();
+	private Key sessionKey;
 
 	public void init(char[] password, String alias, KeyStore... ks) {
 		
@@ -35,6 +36,8 @@ public class Library {
 				e.printStackTrace();
 			}
 		}
+		
+		sessionKey = server.init(ck.getPrivateK());
 	}
 
 	public void register_user() {
