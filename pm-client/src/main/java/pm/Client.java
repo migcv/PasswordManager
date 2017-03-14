@@ -17,10 +17,11 @@ public class Client {
 		System.out.println("Save");
 		System.out.println(new String(c.retrieve_password("www.google.com".getBytes(), "Miguel".getBytes()), "UTF-8"));
 		System.out.println("Retrieve");
+		c.save_password("www.google.com".getBytes(), "Miguel".getBytes(), "Mamas".getBytes());
+		System.out.println("Save");
+		System.out.println(new String(c.retrieve_password("www.google.com".getBytes(), "Miguel".getBytes()), "UTF-8"));
+		System.out.println("Retrieve");
 		c.close();
-
-		// c.playGame(server);
-		// c.congratulate();
 
 	}
 

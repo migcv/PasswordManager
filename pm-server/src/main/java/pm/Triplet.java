@@ -1,12 +1,11 @@
 package pm;
 
-import java.security.Key;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.io.Serializable;
 
-public class Triplet {
+public class Triplet  implements Serializable{
 
+	private static final long serialVersionUID = 1L;
+	
 	private byte[] domain;
 	private byte[] username;
 	private byte[] password;

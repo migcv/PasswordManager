@@ -2,10 +2,6 @@ package test;
 
 import java.rmi.Naming;
 
-import org.junit.*;
-
-import org.junit.Test;
-
 import pm.ServerService;
 
 public class PMTest {
