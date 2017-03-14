@@ -9,11 +9,14 @@ public class Triplet  implements Serializable{
 	private byte[] domain;
 	private byte[] username;
 	private byte[] password;
+	
+	private byte[] salt;
 
-	public Triplet(byte[] domain, byte[] username, byte[] password) {
+	public Triplet(byte[] domain, byte[] username, byte[] password, byte[] salt) {
 		this.setDomain(domain);
 		this.setUsername(username);
 		this.setPassword(password);
+		this.setSalt(salt);
 	}
 
 	public byte[] getPassword() {
@@ -38,6 +41,14 @@ public class Triplet  implements Serializable{
 
 	public void setDomain(byte[] domain) {
 		this.domain = domain;
+	}
+
+	public byte[] getSalt() {
+		return salt;
+	}
+
+	public void setSalt(byte[] salt) {
+		this.salt = salt;
 	}
 	
 }

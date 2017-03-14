@@ -1,5 +1,6 @@
 package pm;
 
+import java.io.UnsupportedEncodingException;
 import java.rmi.Naming;
 import java.rmi.RemoteException;
 import java.security.*;
@@ -161,8 +162,14 @@ public class Library {
 			
 			ivspec = new IvParameterSpec(iv);
 			
-			Cipher firstDecipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-			firstDecipher.init(Cipher.DECRYPT_MODE, sessionKey, ivspec);
+			// COM CBC
+			//Cipher firstDecipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+			//firstDecipher.init(Cipher.DECRYPT_MODE, sessionKey, ivspec);
+			
+			// COM ECB
+			Cipher firstDecipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
+			firstDecipher.init(Cipher.DECRYPT_MODE, sessionKey);
+			
 			aux = firstDecipher.doFinal(passwordCipher);
 
 			// Decipher Password with Private Key

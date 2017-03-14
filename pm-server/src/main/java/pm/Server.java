@@ -4,11 +4,13 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
+import java.io.UnsupportedEncodingException;
 import java.rmi.*;
 import java.rmi.server.*;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.Key;
+import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.PublicKey;
 import java.security.SecureRandom;
@@ -116,9 +118,19 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 		for (int i = 0; i < tripletList.size(); i++) {
 			// Verifies if the domain & username exists, if true, replace
 			// password with new one
-			if (Arrays.equals(tripletList.get(i).getDomain(), domainDeciphered)
-					&& Arrays.equals(tripletList.get(i).getUsername(), usernameDeciphered)) {
+			if (Arrays.equals(tripletList.get(i).getDomain(), diggestSalt(domainDeciphered, tripletList.get(i).getSalt()))
+					&& Arrays.equals(tripletList.get(i).getUsername(), diggestSalt(usernameDeciphered, tripletList.get(i).getSalt()))) {
+				
+				SecureRandom random = new SecureRandom();
+				byte[] salt = new byte[64];
+				random.nextBytes(salt);
+				
+				tripletList.get(i).setDomain(diggestSalt(domainDeciphered, salt));
+				tripletList.get(i).setUsername(diggestSalt(usernameDeciphered, salt));
+				tripletList.get(i).setSalt(salt);
+				
 				tripletList.get(i).setPassword(passwordDeciphered);
+				
 				exists = true;
 				break;
 			}
@@ -126,10 +138,18 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 		// If domain & username doesnt exists, add new triplet (doamin,
 		// username, password)
 		if (!exists) {
-			tripletList.add(new Triplet(domainDeciphered, usernameDeciphered, passwordDeciphered));
+			SecureRandom random = new SecureRandom();
+			byte[] salt = new byte[64];
+			random.nextBytes(salt);
+			
+			domainDeciphered = diggestSalt(domainDeciphered, salt);
+			usernameDeciphered = diggestSalt(usernameDeciphered, salt);
+			
+			tripletList.add(new Triplet(domainDeciphered, usernameDeciphered, passwordDeciphered, salt));
 		}
 		// Put back the list of triplet in the map
 		publicKeyMap.put(publicKey, tripletList);
+		
 		//saveState();
 	}
 
@@ -173,8 +193,8 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 
 		for (int i = 0; i < tripletList.size(); i++) {
 			// Verifies if the domain & username exists, if true, sends password
-			if (Arrays.equals(tripletList.get(i).getDomain(), domainDeciphered)
-					&& Arrays.equals(tripletList.get(i).getUsername(), usernameDeciphered)) {
+			if (Arrays.equals(tripletList.get(i).getDomain(), diggestSalt(domainDeciphered, tripletList.get(i).getSalt()))
+					&& Arrays.equals(tripletList.get(i).getUsername(), diggestSalt(usernameDeciphered, tripletList.get(i).getSalt()))) {
 				
 				try {
 					// Generate a random IV
@@ -184,9 +204,17 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 				    IvParameterSpec ivspec = new IvParameterSpec(res_iv);
 				    
 				    // Cipher password with session key
-					Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-					cipher.init(Cipher.ENCRYPT_MODE, sessionKeyMap.get(publicKey), ivspec);
+				    
+				    // COM CBC
+					//Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+					//cipher.init(Cipher.ENCRYPT_MODE, sessionKeyMap.get(publicKey), ivspec);
+				    
+				    // COM ECB
+				    Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
+				    cipher.init(Cipher.ENCRYPT_MODE, sessionKeyMap.get(publicKey));
+				    
 					passwordCiphered = cipher.doFinal(tripletList.get(i).getPassword());
+					
 				} catch (IllegalBlockSizeException e) {
 					e.printStackTrace();
 				} catch (BadPaddingException e) {
@@ -196,8 +224,6 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 				} catch (NoSuchAlgorithmException e) {
 					e.printStackTrace();
 				} catch (NoSuchPaddingException e) {
-					e.printStackTrace();
-				} catch (InvalidAlgorithmParameterException e) {
 					e.printStackTrace();
 				}
 				
@@ -241,6 +267,20 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 		} catch (InvalidKeyException e) {
 			e.printStackTrace();
 		} catch (NoSuchAlgorithmException e) {
+			e.printStackTrace();
+		}
+		return res;
+	}
+	
+	private byte[] diggestSalt(byte[] content, byte[] salt) {
+		MessageDigest sha;
+		byte[] res = null;
+		try {
+			sha = MessageDigest.getInstance("SHA-256");
+			sha.update(concat(content, salt));
+			res = sha.digest();
+		} catch (NoSuchAlgorithmException e) {
+			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 		return res;
