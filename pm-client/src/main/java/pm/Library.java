@@ -4,6 +4,7 @@ import java.rmi.Naming;
 import java.rmi.RemoteException;
 import java.security.*;
 import java.security.cert.X509Certificate;
+import java.util.ArrayList;
 
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
@@ -20,7 +21,7 @@ public class Library {
 	private SecretKey sessionKey = null;
 
 	public void init(char[] password, String alias, KeyStore... ks) {
-		
+
 		// Initializes a connection to the Server
 		connectToServer();
 		// Generate a new key pair
@@ -30,7 +31,7 @@ public class Library {
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
-		} 
+		}
 		// Extracts the key pair
 		else {
 			try {
@@ -39,29 +40,26 @@ public class Library {
 				e.printStackTrace();
 			}
 		}
-		
+
 		try {
 			byte[] sessionKeyEncryp = server.init(ck.getPublicK());
+
 			Cipher cipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding");
 			cipher.init(Cipher.DECRYPT_MODE, ck.getPrivateK());
 			byte[] aux = cipher.doFinal(sessionKeyEncryp);
+
 			sessionKey = new SecretKeySpec(aux, 0, aux.length, "AES");
 		} catch (RemoteException e) {
 			e.printStackTrace();
 		} catch (InvalidKeyException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		} catch (NoSuchAlgorithmException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		} catch (NoSuchPaddingException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		} catch (IllegalBlockSizeException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		} catch (BadPaddingException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 	}
@@ -77,23 +75,40 @@ public class Library {
 	}
 
 	public void save_password(byte[] domain, byte[] username, byte[] password) {
-		
-		byte[] passEncryp = null, domainHash = null, usernameHash = null;
+
+		byte[] passEncryp = null, domainHash = null, usernameHash = null, aux = null, domainEncry = null,
+				usernameEncry = null;
 
 		try {
+
 			// Cipher Password with Public Key
 			Cipher cipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding");
 			cipher.init(Cipher.ENCRYPT_MODE, ck.getPublicK());
-			passEncryp = cipher.doFinal(password);
-			
+			aux = cipher.doFinal(password);
+
+			// Cipher Password with Session Key
+			SecureRandom random = new SecureRandom();
+			byte[] iv = new byte[16];
+			random.nextBytes(iv);
+			IvParameterSpec ivspec = new IvParameterSpec(iv);
+
+			Cipher firstCipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+			firstCipher.init(Cipher.ENCRYPT_MODE, sessionKey, ivspec);
+			passEncryp = firstCipher.doFinal(aux);
+
 			// Digest of Domain and Username
 			domainHash = ck.digest(domain);
 			usernameHash = ck.digest(username);
-			// Signature of all data, H(domain), H(username) & E(password)
-			byte[] signature = ck.signature(domainHash, usernameHash, passEncryp);
 			
-			server.put(ck.getPublicK(), domainHash, usernameHash, passEncryp, signature);
-			
+			// Signature of all data, E( H(domain)), E( H(username)) & E(password)
+
+			domainEncry = firstCipher.doFinal(domainHash);
+			usernameEncry = firstCipher.doFinal(usernameHash);
+
+			byte[] signature = ck.signature(domainEncry, usernameEncry, passEncryp);
+
+			server.put(ck.getPublicK(), domainEncry, usernameEncry, passEncryp, iv ,signature);
+
 		} catch (RemoteException e) {
 			e.printStackTrace();
 		} catch (InvalidKeyException e) {
@@ -108,30 +123,31 @@ public class Library {
 			e.printStackTrace();
 		} catch (SignatureException e) {
 			e.printStackTrace();
+		} catch (InvalidAlgorithmParameterException e) {
+			e.printStackTrace();
 		}
 	}
 
 	public byte[] retrieve_password(byte[] domain, byte[] username) {
-		
+
 		byte[] password = null, domainHash = null, usernameHash = null, aux = null;
-		byte[] passwordEncrypted = null;
-		
+		ArrayList<byte[]> passwordEncrypted = new ArrayList<byte[]>();
+
 		try {
 			// Digest of Domain and Username
 			domainHash = ck.digest(domain);
 			usernameHash = ck.digest(username);
 			// Signature of all data, H(domain), H(username)
 			byte[] signature = ck.signature(domainHash, usernameHash);
-			
+
 			passwordEncrypted = server.get(ck.getPublicK(), domainHash, usernameHash, signature);
-			
+
 			// Decipher with Session Key
-			byte[] iv = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-		    IvParameterSpec ivspec = new IvParameterSpec(iv);
+
 			Cipher firstCipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
 			firstCipher.init(Cipher.DECRYPT_MODE, sessionKey, ivspec);
 			aux = firstCipher.doFinal(passwordEncrypted);
-			
+
 			// Decipher Password with Private Key
 			Cipher cipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding");
 			cipher.init(Cipher.DECRYPT_MODE, ck.getPrivateK());
@@ -165,7 +181,7 @@ public class Library {
 		// RMI's TCP connections are managed invisibly under the hood.
 		// Just let the stub be garbage-collected.
 	}
-	
+
 	private void connectToServer() {
 		if (System.getSecurityManager() == null) {
 			System.setSecurityManager(new SecurityManager());
