@@ -37,7 +37,11 @@ public class Library {
 			}
 		}
 		
-		sessionKey = server.init(ck.getPrivateK());
+		try {
+			sessionKey = server.init(ck.getPrivateK());
+		} catch (RemoteException e) {
+			e.printStackTrace();
+		}
 	}
 
 	public void register_user() {
