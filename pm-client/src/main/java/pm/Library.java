@@ -40,14 +40,27 @@ public class Library {
 		}
 		
 		try {
-			
 			byte[] sessionKeyEncryp = server.init(ck.getPublicK());
 			Cipher cipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding");
 			cipher.init(Cipher.DECRYPT_MODE, ck.getPrivateK());
 			byte[] aux = cipher.doFinal(sessionKeyEncryp);
 			sessionKey = new SecretKeySpec(aux, 0, aux.length, "AES");
-			
 		} catch (RemoteException e) {
+			e.printStackTrace();
+		} catch (InvalidKeyException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (NoSuchAlgorithmException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (NoSuchPaddingException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IllegalBlockSizeException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (BadPaddingException e) {
+			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 	}

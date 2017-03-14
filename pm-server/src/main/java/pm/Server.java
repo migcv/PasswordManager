@@ -18,7 +18,13 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
+import javax.crypto.BadPaddingException;
+import javax.crypto.Cipher;
+import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.KeyGenerator;
+import javax.crypto.NoSuchPaddingException;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.SecretKeySpec;
 
 import pm.exception.DomainOrUsernameDoesntExistException;
 import pm.exception.PublicKeyDoesntExistException;
@@ -36,10 +42,27 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 		super();
 	}
 	
-	public Key init(Key publicKey) throws RemoteException {
-		Key sessionKey = createSessionKey();
+	public byte[] init(Key publicKey) throws RemoteException {
+		SecretKey sessionKey = createSessionKey();
 		sessionKeyMap.put(publicKey, sessionKey);
-		return sessionKey;
+		Cipher cipher;
+		byte[] res = null;
+		try {
+			cipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding");
+			cipher.init(Cipher.ENCRYPT_MODE, publicKey);
+			res = cipher.doFinal(sessionKey.getEncoded());
+		} catch (NoSuchAlgorithmException e) {
+			e.printStackTrace();
+		} catch (NoSuchPaddingException e) {
+			e.printStackTrace();
+		} catch (InvalidKeyException e) {
+			e.printStackTrace();
+		} catch (IllegalBlockSizeException e) {
+			e.printStackTrace();
+		} catch (BadPaddingException e) {
+			e.printStackTrace();
+		}
+		return res;
 	}
 
 	public void register(Key publicKey) throws RemoteException {
@@ -109,9 +132,9 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 	}
 
 	// Generate a session key
-	private Key createSessionKey() {
+	private SecretKey createSessionKey() {
 		KeyGenerator keyGenerator;
-		Key key = null;
+		SecretKey key = null;
 		try {
 			keyGenerator = KeyGenerator.getInstance("AES");
 			keyGenerator.init(256, new SecureRandom());
@@ -119,7 +142,6 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 		} catch (NoSuchAlgorithmException e) {
 			e.printStackTrace();
 		}
-		System.out.println(key.toString());
 		return key;
 	}
 
