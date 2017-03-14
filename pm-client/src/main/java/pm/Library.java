@@ -10,6 +10,7 @@ import javax.crypto.Cipher;
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
+import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
 public class Library {
@@ -125,8 +126,10 @@ public class Library {
 			passwordEncrypted = server.get(ck.getPublicK(), domainHash, usernameHash, signature);
 			
 			// Decipher with Session Key
+			byte[] iv = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+		    IvParameterSpec ivspec = new IvParameterSpec(iv);
 			Cipher firstCipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-			firstCipher.init(Cipher.DECRYPT_MODE, sessionKey);
+			firstCipher.init(Cipher.DECRYPT_MODE, sessionKey, ivspec);
 			aux = firstCipher.doFinal(passwordEncrypted);
 			
 			// Decipher Password with Private Key
@@ -147,6 +150,8 @@ public class Library {
 		} catch (InvalidKeyException e) {
 			e.printStackTrace();
 		} catch (SignatureException e) {
+			e.printStackTrace();
+		} catch (InvalidAlgorithmParameterException e) {
 			e.printStackTrace();
 		}
 		return password;

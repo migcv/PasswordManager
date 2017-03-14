@@ -6,6 +6,7 @@ import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.rmi.*;
 import java.rmi.server.*;
+import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.Key;
 import java.security.NoSuchAlgorithmException;
@@ -24,6 +25,7 @@ import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.KeyGenerator;
 import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
+import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
 import pm.exception.DomainOrUsernameDoesntExistException;
@@ -36,7 +38,7 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 
 	private Map<Key, ArrayList<Triplet>> publicKeyMap = new HashMap<Key, ArrayList<Triplet>>();
 	
-	private Map<Key, Key> sessionKeyMap = new HashMap<Key, Key>();
+	private Map<Key, SecretKey> sessionKeyMap = new HashMap<Key, SecretKey>();
 
 	protected Server() throws RemoteException {
 		super();
@@ -113,6 +115,7 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 			throw new SignatureWrongException();
 		}
 		
+		byte[] passwordCiphered = null;
 		ArrayList<Triplet> tripletList = publicKeyMap.get(publicKey);
 
 		// Verifies if the publicKey exists
@@ -124,7 +127,34 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 			// Verifies if the domain & username exists, if true, sends password
 			if (Arrays.equals(tripletList.get(i).getDomain(), domain)
 					&& Arrays.equals(tripletList.get(i).getUsername(), username)) {
-				return tripletList.get(i).getPassword();
+				
+				try {
+					byte[] iv = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+				    IvParameterSpec ivspec = new IvParameterSpec(iv);
+					Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+					cipher.init(Cipher.ENCRYPT_MODE, sessionKeyMap.get(publicKey), ivspec);
+					passwordCiphered = cipher.doFinal(tripletList.get(i).getPassword());
+				} catch (IllegalBlockSizeException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				} catch (BadPaddingException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				} catch (InvalidKeyException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				} catch (NoSuchAlgorithmException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				} catch (NoSuchPaddingException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				} catch (InvalidAlgorithmParameterException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+				
+				return passwordCiphered;
 			}
 		}
 
