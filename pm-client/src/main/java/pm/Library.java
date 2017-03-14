@@ -14,6 +14,7 @@ public class Library {
 
 	private ServerService server = null;
 	private KeyManagement ck = new KeyManagement();
+	private Key sessionKey;
 
 	private void connectToServer() {
 		if (System.getSecurityManager() == null) {
@@ -49,6 +50,8 @@ public class Library {
 				e.printStackTrace();
 			}
 		}
+		
+		sessionKey = server.init(ck.getPrivateK());
 	}
 
 	public void register_user() {
