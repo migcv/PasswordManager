@@ -29,9 +29,17 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 	private static final long serialVersionUID = 1L;
 
 	private Map<Key, ArrayList<Triplet>> publicKeyMap = new HashMap<Key, ArrayList<Triplet>>();
+	
+	private Map<Key, Key> sessionKeyMap = new HashMap<Key, Key>();
 
 	protected Server() throws RemoteException {
 		super();
+	}
+	
+	public Key init(Key publicKey) throws RemoteException {
+		Key sessionKey = createSessionKey();
+		sessionKeyMap.put(publicKey, sessionKey);
+		return sessionKey;
 	}
 
 	public void register(Key publicKey) throws RemoteException {
@@ -101,8 +109,7 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 	}
 
 	// Generate a session key (NOT USED YET)
-	@SuppressWarnings("unused")
-	private Key sessionKey() {
+	private Key createSessionKey() {
 		KeyGenerator keyGenerator;
 		Key key = null;
 		try {
@@ -113,7 +120,6 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 			e.printStackTrace();
 		}
 		return key;
-
 	}
 
 	// Checks if the signature is valid
