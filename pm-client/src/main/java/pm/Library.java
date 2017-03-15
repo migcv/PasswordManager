@@ -145,7 +145,7 @@ public class Library {
 
 	public void save_password(byte[] domain, byte[] username, byte[] password) {
 
-		byte[] passEncryp = null, domainEncry = null, usernameEncry = null;
+		byte[] passEncryp = null, domainEncry = null, usernameEncry = null, nounceCiphered = null;
 
 		try {
 			// Cipher Password with Public Key
@@ -170,6 +170,7 @@ public class Library {
 			passEncryp = simetricCipher.doFinal(passEncryp);
 			domainEncry = simetricCipher.doFinal(domainHash);
 			usernameEncry = simetricCipher.doFinal(usernameHash);
+			nounceCiphered = simetricCipher.doFinal(nouce.toByteArray());
 
 			// Signature of all data [ E(H(domain)), E(H(username)),
 			// E(E(password)) & IV ]
