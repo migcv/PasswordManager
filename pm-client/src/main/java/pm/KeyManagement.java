@@ -67,6 +67,24 @@ public class KeyManagement {
 		byte[] signature = rsaForSign.sign();
 		return signature;
 	}
+	
+	public boolean verifySignature(Key publicKey, byte[] signature, byte[]... data) {
+		byte[] allData = concat(data);
+		boolean res = false;
+		try {
+			Signature rsaForVerify = Signature.getInstance("SHA256withRSA");
+			rsaForVerify.initVerify((PublicKey) publicKey);
+			rsaForVerify.update(allData);
+			res = rsaForVerify.verify(signature);
+		} catch (SignatureException e) {
+			e.printStackTrace();
+		} catch (InvalidKeyException e) {
+			e.printStackTrace();
+		} catch (NoSuchAlgorithmException e) {
+			e.printStackTrace();
+		}
+		return res;
+	}
 
 	static byte[] concat(byte[]... arrays) {
 		// Determine the length of the result array

@@ -1,10 +1,10 @@
 package pm;
 
-import java.io.UnsupportedEncodingException;
 import java.rmi.Naming;
 import java.rmi.RemoteException;
 import java.security.*;
-import java.security.cert.X509Certificate;
+import java.security.spec.InvalidKeySpecException;
+import java.security.spec.X509EncodedKeySpec;
 import java.util.ArrayList;
 
 import javax.crypto.BadPaddingException;
@@ -18,10 +18,15 @@ import javax.crypto.spec.SecretKeySpec;
 public class Library {
 
 	private ServerService server = null;
-	private KeyManagement ck = new KeyManagement();
+	
+	private KeyManagement ck = null;
+	
+	private PublicKey serverKey = null;
 	private SecretKey sessionKey = null;
 
 	public void init(char[] password, String alias, KeyStore... ks) {
+		
+		ck = new KeyManagement();
 
 		// Initializes a connection to the Server
 		connectToServer();
@@ -29,6 +34,7 @@ public class Library {
 		if (ks.length == 0) {
 			try {
 				ck.generateKeyPair(password, alias);
+				System.out.println("init: generating new key pair!");
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
@@ -37,17 +43,32 @@ public class Library {
 		else {
 			try {
 				ck.getKeys(ks[0], alias, password);
+				System.out.println("init: extracting key pair!");
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
 		}
 
 		try {
-			byte[] sessionKeyEncryp = server.init(ck.getPublicK());
-
+			// data ==> [ Server_Public_Key, Session_Key, Signature ]
+			ArrayList<byte[]> data = server.init(ck.getPublicK());
+			
+			// Server's public key
+			serverKey = KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(data.get(0)));
+			
+			// Verifies Signature
+			if(!ck.verifySignature(serverKey, data.get(2), data.get(1))) {
+				System.out.println("init: signature wrong!");
+				return;
+			}
+			
+			// Session key ciphered
+			byte[] sessionKeyCiphered = data.get(1);
+			
+			// Deciphering of the session key
 			Cipher decipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding");
 			decipher.init(Cipher.DECRYPT_MODE, ck.getPrivateK());
-			byte[] aux = decipher.doFinal(sessionKeyEncryp);
+			byte[] aux = decipher.doFinal(sessionKeyCiphered);
 
 			sessionKey = new SecretKeySpec(aux, 0, aux.length, "AES");
 		} catch (RemoteException e) {
@@ -62,6 +83,8 @@ public class Library {
 			e.printStackTrace();
 		} catch (BadPaddingException e) {
 			e.printStackTrace();
+		} catch (InvalidKeySpecException e) {
+			e.printStackTrace();
 		}
 	}
 
@@ -69,6 +92,7 @@ public class Library {
 
 		try {
 			server.register(ck.getPublicK());
+			System.out.println("register: user registered!");
 		} catch (RemoteException e) {
 			e.printStackTrace();
 		}
@@ -77,38 +101,36 @@ public class Library {
 
 	public void save_password(byte[] domain, byte[] username, byte[] password) {
 
-		byte[] passEncryp = null, domainHash = null, usernameHash = null, aux = null, domainEncry = null,
-				usernameEncry = null;
+		byte[] passEncryp = null, domainEncry = null, usernameEncry = null;
 
 		try {
-
 			// Cipher Password with Public Key
 			Cipher cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
 			cipher.init(Cipher.ENCRYPT_MODE, ck.getPublicK());
-			aux = cipher.doFinal(password);
+			passEncryp = cipher.doFinal(password);
 
-			// Cipher Password with Session Key
+			// Generate a random IV
 			SecureRandom random = new SecureRandom();
 			byte[] iv = new byte[16];
 			random.nextBytes(iv);
 			IvParameterSpec ivspec = new IvParameterSpec(iv);
 
-			Cipher firstCipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-			firstCipher.init(Cipher.ENCRYPT_MODE, sessionKey, ivspec);
-			passEncryp = firstCipher.doFinal(aux);
-
 			// Digest of Domain and Username
-			domainHash = ck.digest(domain);
-			usernameHash = ck.digest(username);
+			byte[] domainHash = ck.digest(domain);
+			byte[] usernameHash = ck.digest(username);
 
-			// Signature of all data, E( H(domain)), E( H(username)) &
-			// E(password)
+			// Cipher domain, username & password with session key
+			Cipher simetricCipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+			simetricCipher.init(Cipher.ENCRYPT_MODE, sessionKey, ivspec);
+			
+			passEncryp = simetricCipher.doFinal(passEncryp);
+			domainEncry = simetricCipher.doFinal(domainHash);
+			usernameEncry = simetricCipher.doFinal(usernameHash);
+			
+			// Signature of all data [ E(H(domain)), E(H(username)), E(E(password)) & IV ]
+			byte[] signature = ck.signature(domainEncry, usernameEncry, passEncryp, iv);
 
-			domainEncry = firstCipher.doFinal(domainHash);
-			usernameEncry = firstCipher.doFinal(usernameHash);
-
-			byte[] signature = ck.signature(domainEncry, usernameEncry, passEncryp);
-
+			// Data sending ==> [ CKpub, E(H(domain)), E(H(username)), E(E(password)), IV, signature ]
 			server.put(ck.getPublicK(), domainEncry, usernameEncry, passEncryp, iv, signature);
 
 		} catch (RemoteException e) {
@@ -132,36 +154,46 @@ public class Library {
 
 	public byte[] retrieve_password(byte[] domain, byte[] username) {
 
-		byte[] password = null, domainHash = null, usernameHash = null, aux = null, domainEncryp = null, usernameEncryp = null;
+		byte[] password = null, password_aux = null, domainEncryp = null, usernameEncryp = null;
 		ArrayList<byte[]> data = new ArrayList<byte[]>();
 
 		try {
+			// Generate a random IV
 			SecureRandom random = new SecureRandom();
 			byte[] iv = new byte[16];
 			random.nextBytes(iv);
 			IvParameterSpec ivspec = new IvParameterSpec(iv);
 			
+			// Digest of Domain and Username
+			byte[] domainHash = ck.digest(domain);
+			byte[] usernameHash = ck.digest(username);
+			
+			// Cipher domain & username with session key
 			Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
 			cipher.init(Cipher.ENCRYPT_MODE, sessionKey, ivspec);
 			
-			
-			// Digest of Domain and Username
-			domainHash = ck.digest(domain);
-			usernameHash = ck.digest(username);
-			
 			domainEncryp = cipher.doFinal(domainHash);
 			usernameEncryp = cipher.doFinal(usernameHash);
-			// Signature of all data, E( H(domain)), E( H(username))
-			byte[] signature = ck.signature(domainEncryp, usernameEncryp);
-
+			
+			// Signature of all data, E(H(domain)), E(H(username)) & IV
+			byte[] signature = ck.signature(domainEncryp, usernameEncryp, iv);
+			
+			// Data sending ==> [ CKpub, E(H(domain)), E(H(username)), IV, signature ]
 			data = server.get(ck.getPublicK(), domainEncryp, usernameEncryp, iv, signature);
+			// Data received ==> [ password, iv, signature ]
+			
+			// Verifies Signature - verifySignature(public_key, signature, password, iv)
+			if(!ck.verifySignature(serverKey, data.get(2), data.get(0), data.get(1))) {
+				throw new SignatureWrongException();
+			}
 
-			// Decipher with Session Key
+			// Extracting IV
 			byte[] passwordCipher = data.get(0);
 			iv = data.get(1);
 			
 			ivspec = new IvParameterSpec(iv);
 			
+			// Decipher password with Session Key
 			// COM CBC
 			//Cipher firstDecipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
 			//firstDecipher.init(Cipher.DECRYPT_MODE, sessionKey, ivspec);
@@ -170,12 +202,12 @@ public class Library {
 			Cipher firstDecipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
 			firstDecipher.init(Cipher.DECRYPT_MODE, sessionKey);
 			
-			aux = firstDecipher.doFinal(passwordCipher);
+			password_aux = firstDecipher.doFinal(passwordCipher);
 
 			// Decipher Password with Private Key
 			Cipher decipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
 			decipher.init(Cipher.DECRYPT_MODE, ck.getPrivateK());
-			password = decipher.doFinal(aux);
+			password = decipher.doFinal(password_aux);
 
 		} catch (RemoteException e) {
 			e.printStackTrace();
@@ -198,14 +230,14 @@ public class Library {
 	}
 
 	public void close() {
-		// It's better to leave it
-		// the connection between RMI client and server is implicit.
-		// The connection closes after a short idle period of time
-		// automatically.
-		// RMI's TCP connections are managed invisibly under the hood.
-		// Just let the stub be garbage-collected.
+		server = null;
+		ck = null;
+		serverKey = null;
+		sessionKey = null;
+		System.out.println("close: session closed!");
 	}
 
+	// Connection to the server 
 	private void connectToServer() {
 		if (System.getSecurityManager() == null) {
 			System.setSecurityManager(new SecurityManager());

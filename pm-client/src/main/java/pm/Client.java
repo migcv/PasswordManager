@@ -14,20 +14,23 @@ public class Client {
 		Library c = new Library();
 		
 		c.init("password".toCharArray(), "alias");
-		System.out.println("Init");
 		
 		c.register_user();
-		System.out.println("Register");
 		
-		c.save_password("www.google.com".getBytes(), "Miguel".getBytes(), "Macaco".getBytes());
-		System.out.println("Save: www.google.com, Miguel, Macaco");
+		c.save_password("www.google.com".getBytes(), "Alice".getBytes(), "SEC_16_17".getBytes());
+		System.out.println("save: [ www.google.com, Alice, SEC_16_17 ]");
 		
-		System.out.println("Retrieve: " + new String(c.retrieve_password("www.google.com".getBytes(), "Miguel".getBytes()), "UTF-8"));
+		System.out.println("retrieve: [ www.google.com, Alice ] ==> " + new String(c.retrieve_password("www.google.com".getBytes(), "Alice".getBytes()), "UTF-8"));
 		
-		c.save_password("www.google.com".getBytes(), "Miguel".getBytes(), "Chimpaze".getBytes());
-		System.out.println("Save: www.google.com, Miguel, Chimpaze");
+		c.save_password("www.youtube.com".getBytes(), "Bob".getBytes(), "A_CES".getBytes());
+		System.out.println("save: [ www.youtube.com, Bob, A_CES ]");
 		
-		System.out.println("Retrieve: " + new String(c.retrieve_password("www.google.com".getBytes(), "Miguel".getBytes()), "UTF-8"));
+		c.save_password("www.google.com".getBytes(), "Alice".getBytes(), "IST".getBytes());
+		System.out.println("save: [ www.google.com, Alice, IST ]");
+		
+		System.out.println("retrieve: [ www.youtube.com, Bob ] ==> " + new String(c.retrieve_password("www.youtube.com".getBytes(), "Bob".getBytes()), "UTF-8"));
+		
+		System.out.println("retrieve: [ www.google.com, Alice ] ==> " + new String(c.retrieve_password("www.google.com".getBytes(), "Alice".getBytes()), "UTF-8"));
 		
 		c.close();
 

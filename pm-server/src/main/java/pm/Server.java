@@ -10,8 +10,11 @@ import java.rmi.server.*;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.Key;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.SecureRandom;
 import java.security.Signature;
@@ -37,6 +40,9 @@ import pm.exception.SignatureWrongException;
 public class Server extends UnicastRemoteObject implements ServerService, Serializable {
 
 	private static final long serialVersionUID = 1L;
+	
+	private PublicKey publicKey;
+	private PrivateKey privateKey; 
 
 	private Map<Key, ArrayList<Triplet>> publicKeyMap = new HashMap<Key, ArrayList<Triplet>>();
 	
@@ -44,17 +50,36 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 
 	protected Server() throws RemoteException {
 		super();
+		// Generate a key pair, public & private key
+		KeyPairGenerator keyGen;
+		try {
+			keyGen = KeyPairGenerator.getInstance("RSA");
+		
+			keyGen.initialize(2048);
+			KeyPair keypair = keyGen.genKeyPair();
+	
+			privateKey = keypair.getPrivate();
+			publicKey = keypair.getPublic();
+			
+		} catch (NoSuchAlgorithmException e) {
+			e.printStackTrace();
+		}
 	}
 	
-	public byte[] init(Key publicKey) throws RemoteException {
+	public ArrayList<byte[]> init(Key publicKey) throws RemoteException {
 		SecretKey sessionKey = createSessionKey();
 		sessionKeyMap.put(publicKey, sessionKey);
 		Cipher cipher;
-		byte[] res = null;
+		byte[] sessionKeyCiphered = null, signature = null;
 		try {
+			// Cipher Session Key with Client's public key
 			cipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding");
 			cipher.init(Cipher.ENCRYPT_MODE, publicKey);
-			res = cipher.doFinal(sessionKey.getEncoded());
+			sessionKeyCiphered = cipher.doFinal(sessionKey.getEncoded());
+			
+			// Signature contaning [ Session Key ] signed with Server's private key
+			signature = sign(sessionKeyCiphered);
+			
 		} catch (NoSuchAlgorithmException e) {
 			e.printStackTrace();
 		} catch (NoSuchPaddingException e) {
@@ -65,7 +90,13 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 			e.printStackTrace();
 		} catch (BadPaddingException e) {
 			e.printStackTrace();
+		} catch (SignatureException e) {
+			e.printStackTrace();
 		}
+		ArrayList<byte[]> res = new ArrayList<byte[]>();
+		res.add(this.publicKey.getEncoded());
+		res.add(sessionKeyCiphered);
+		res.add(signature);
 		return res;
 	}
 
@@ -79,7 +110,7 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 			throws RemoteException, PublicKeyDoesntExistException, SignatureWrongException {
 		
 		// Verify Signature
-		if (!verifySignatue(publicKey, signature, domain, username, password)) {
+		if (!verifySignature(publicKey, signature, domain, username, password, iv)) {
 			throw new SignatureWrongException();
 		}
 		
@@ -156,11 +187,11 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 	public ArrayList<byte[]> get(Key publicKey, byte[] domain, byte[] username, byte[] iv, byte[] signature) throws RemoteException,
 			PublicKeyDoesntExistException, DomainOrUsernameDoesntExistException, SignatureWrongException {
 		// Verify Signature
-		if (!verifySignatue(publicKey, signature, domain, username)) {
+		if (!verifySignature(publicKey, signature, domain, username, iv)) {
 			throw new SignatureWrongException();
 		}
 		
-		byte[] domainDeciphered = null, usernameDeciphered = null;
+		byte[] domainDeciphered = null, usernameDeciphered = null, signatureToSend = null;
 		
 		// Decipher content
 		try {
@@ -215,6 +246,9 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 				    
 					passwordCiphered = cipher.doFinal(tripletList.get(i).getPassword());
 					
+					// Signature contaning [ password, iv ] signed with Server's private key
+					signatureToSend = sign(passwordCiphered, iv);
+					
 				} catch (IllegalBlockSizeException e) {
 					e.printStackTrace();
 				} catch (BadPaddingException e) {
@@ -225,18 +259,33 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 					e.printStackTrace();
 				} catch (NoSuchPaddingException e) {
 					e.printStackTrace();
+				} catch (SignatureException e) {
+					e.printStackTrace();
 				}
 				
-				// Create List to send with <password_ciphered, iv>
+				// Create List to send with [ password_ciphered, iv, signature ]
 				ArrayList<byte[]> res = new ArrayList<byte[]>();
 				res.add(passwordCiphered);
 				res.add(iv);
+				res.add(signatureToSend);
 				
 				return res;
 			}
 		}
 
 		throw new DomainOrUsernameDoesntExistException();
+	}
+	
+	// Funtion that signs data with Server's private key
+	public byte[] sign(byte[]... arrays) throws NoSuchAlgorithmException, InvalidKeyException, SignatureException {
+
+		byte[] toSend = concat(arrays);
+
+		Signature rsaForSign = Signature.getInstance("SHA256withRSA");
+		rsaForSign.initSign(this.privateKey);
+		rsaForSign.update(toSend);
+		byte[] signature = rsaForSign.sign();
+		return signature;
 	}
 
 	// Generate a session key
@@ -254,7 +303,7 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 	}
 
 	// Checks if the signature is valid
-	private boolean verifySignatue(Key publicKey, byte[] signature, byte[]... data) {
+	private boolean verifySignature(Key publicKey, byte[] signature, byte[]... data) {
 		byte[] allData = concat(data);
 		boolean res = false;
 		try {
