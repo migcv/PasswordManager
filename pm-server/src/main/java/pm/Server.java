@@ -94,7 +94,7 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 			iv = new byte[16];
 			random.nextBytes(iv);
 			IvParameterSpec ivspec = new IvParameterSpec(iv);
-			
+
 			cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
 			cipher.init(Cipher.ENCRYPT_MODE, sessionKeyMap.get(publicKey), ivspec);
 			nounceCiphered = cipher.doFinal(nounce.toByteArray());
@@ -127,21 +127,23 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 	public void register(Key publicKey, byte[] n, byte[] iv) throws RemoteException {
 
 		IvParameterSpec ivspec = new IvParameterSpec(iv);
-		
+
 		byte[] nounceDecipher;
 		try {
 			Cipher decipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
 			decipher.init(Cipher.DECRYPT_MODE, sessionKeyMap.get(publicKey), ivspec);
 			nounceDecipher = decipher.doFinal(n);
-			
+
 			BigInteger bg = new BigInteger(nounceDecipher);
-			
-			if(!bg.equals(nounce.shiftLeft(2))){
+
+			nounce = nounce.shiftLeft(2);
+
+			if (!bg.equals(nounce)) {
 				throw new InvalidNounceException();
 			}
-			
+
 			publicKeyMap.put(publicKey, new ArrayList<Triplet>());
-			
+
 		} catch (InvalidKeyException e) {
 			e.printStackTrace();
 		} catch (NoSuchAlgorithmException e) {
@@ -155,21 +157,18 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 		} catch (BadPaddingException e) {
 			e.printStackTrace();
 		}
-		
-		
-		
 
 	}
 
-	public void put(Key publicKey, byte[] domain, byte[] username, byte[] password, byte[] iv, byte[] signature)
-			throws RemoteException, PublicKeyDoesntExistException, SignatureWrongException {
+	public void put(Key publicKey, byte[] domain, byte[] username, byte[] password, byte[] iv, byte[] signature,
+			byte[] n) throws RemoteException, PublicKeyDoesntExistException, SignatureWrongException {
 
 		// Verify Signature
 		if (!verifySignature(publicKey, signature, domain, username, password, iv)) {
 			throw new SignatureWrongException();
 		}
 
-		byte[] domainDeciphered = null, usernameDeciphered = null, passwordDeciphered = null;
+		byte[] domainDeciphered = null, usernameDeciphered = null, passwordDeciphered = null, nounceDeciphered = null;
 
 		// Decipher content
 		try {
@@ -179,6 +178,7 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 			domainDeciphered = cipher.doFinal(domain);
 			usernameDeciphered = cipher.doFinal(username);
 			passwordDeciphered = cipher.doFinal(password);
+			nounceDeciphered = cipher.doFinal(n);
 		} catch (IllegalBlockSizeException e) {
 			e.printStackTrace();
 		} catch (BadPaddingException e) {
@@ -191,6 +191,14 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 			e.printStackTrace();
 		} catch (NoSuchPaddingException e) {
 			e.printStackTrace();
+		}
+
+		BigInteger bg = new BigInteger(nounceDeciphered);
+
+		nounce = nounce.shiftLeft(2);
+
+		if (!bg.equals(nounce)) {
+			throw new InvalidNounceException();
 		}
 
 		boolean exists = false;

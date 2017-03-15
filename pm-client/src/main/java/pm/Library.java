@@ -146,6 +146,8 @@ public class Library {
 	public void save_password(byte[] domain, byte[] username, byte[] password) {
 
 		byte[] passEncryp = null, domainEncry = null, usernameEncry = null, nounceCiphered = null;
+		
+		nouce = nouce.shiftLeft(2);
 
 		try {
 			// Cipher Password with Public Key
@@ -163,7 +165,7 @@ public class Library {
 			byte[] domainHash = ck.digest(domain);
 			byte[] usernameHash = ck.digest(username);
 
-			// Cipher domain, username & password with session key
+			// Cipher domain, username, password & nounce with session key
 			Cipher simetricCipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
 			simetricCipher.init(Cipher.ENCRYPT_MODE, sessionKey, ivspec);
 
@@ -178,7 +180,7 @@ public class Library {
 
 			// Data sending ==> [ CKpub, E(H(domain)), E(H(username)),
 			// E(E(password)), IV, signature ]
-			server.put(ck.getPublicK(), domainEncry, usernameEncry, passEncryp, iv, signature);
+			server.put(ck.getPublicK(), domainEncry, usernameEncry, passEncryp, iv, signature, nounceCiphered);
 
 		} catch (RemoteException e) {
 			e.printStackTrace();
