@@ -26,7 +26,7 @@ public class Library {
 	private PublicKey serverKey = null;
 	private SecretKey sessionKey = null;
 
-	private BigInteger nouce = null;
+	private BigInteger nounce = null;
 
 	public void init(char[] password, String alias, KeyStore... ks) {
 
@@ -89,7 +89,7 @@ public class Library {
 			simetricCipher.init(Cipher.DECRYPT_MODE, sessionKey, ivspec);
 			byte[] nounceDeciphered = simetricCipher.doFinal(nounceCiphered);
 
-			nouce = new BigInteger(nounceDeciphered);
+			nounce = new BigInteger(nounceDeciphered);
 
 		} catch (RemoteException e) {
 			e.printStackTrace();
@@ -114,14 +114,19 @@ public class Library {
 
 		
 		try {
-			nouce = nouce.shiftLeft(2);
 			SecureRandom random = new SecureRandom();
 			byte[] iv = new byte[16];
 			random.nextBytes(iv);
 			IvParameterSpec ivspec = new IvParameterSpec(iv);
+			
+			// Increment nounce
+			nounce = nounce.shiftLeft(2);
+			
+			// Cipher nounce
 			Cipher simetricCipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
 			simetricCipher.init(Cipher.ENCRYPT_MODE, sessionKey, ivspec);
-			byte[] nounceCiphered = simetricCipher.doFinal(nouce.toByteArray());
+			
+			byte[] nounceCiphered = simetricCipher.doFinal(nounce.toByteArray());
 
 			server.register(ck.getPublicK(), nounceCiphered, iv);
 			System.out.println("register: user registered!");
@@ -148,7 +153,7 @@ public class Library {
 
 		byte[] passEncryp = null, domainEncry = null, usernameEncry = null, nounceCiphered = null;
 
-		nouce = nouce.shiftLeft(2);
+		nounce = nounce.shiftLeft(2);
 
 		try {
 			// Cipher Password with Public Key
@@ -173,7 +178,7 @@ public class Library {
 			passEncryp = simetricCipher.doFinal(passEncryp);
 			domainEncry = simetricCipher.doFinal(domainHash);
 			usernameEncry = simetricCipher.doFinal(usernameHash);
-			nounceCiphered = simetricCipher.doFinal(nouce.toByteArray());
+			nounceCiphered = simetricCipher.doFinal(nounce.toByteArray());
 
 			// Signature of all data [ E(H(domain)), E(H(username)),
 			// E(E(password)) & IV ]
@@ -207,7 +212,7 @@ public class Library {
 		byte[] password = null, password_aux = null, domainEncryp = null, usernameEncryp = null, nounceEncryp = null;
 		ArrayList<byte[]> data = new ArrayList<byte[]>();
 		
-		nouce = nouce.shiftLeft(2);
+		nounce = nounce.shiftLeft(2);
 		
 		try {
 			// Generate a random IV
@@ -226,7 +231,7 @@ public class Library {
 
 			domainEncryp = cipher.doFinal(domainHash);
 			usernameEncryp = cipher.doFinal(usernameHash);
-			nounceEncryp = cipher.doFinal(nouce.toByteArray());
+			nounceEncryp = cipher.doFinal(nounce.toByteArray());
 
 			// Signature of all data, E(H(domain)), E(H(username)) & IV
 			byte[] signature = ck.signature(domainEncryp, usernameEncryp, iv);
@@ -272,11 +277,11 @@ public class Library {
 			// Verify nounce
 			BigInteger bg = new BigInteger(nounceDeciphered);
 
-			nouce = nouce.shiftLeft(2);
+			nounce = nounce.shiftLeft(2);
 			
-			System.out.println("1:  " + bg.compareTo(nouce));
+			System.out.println("1:  " + bg.compareTo(nounce));
 
-			if (!bg.equals(nouce)) {
+			if (!bg.equals(nounce)) {
 				throw new InvalidNounceException();
 			}
 
