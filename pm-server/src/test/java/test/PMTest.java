@@ -2,16 +2,12 @@ package test;
 
 import java.rmi.Naming;
 
-import org.junit.After;
-import org.junit.AfterClass;
-import org.junit.Before;
-import org.junit.BeforeClass;
 
 import pm.ServerService;
 
 public class PMTest {
 
-	private static ServerService server = null;
+	/*private static ServerService server = null;
 
 	@BeforeClass
 	public static void oneTimeSetUp() {

@@ -15,8 +15,6 @@ import javax.crypto.SecretKey;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
-import pm.exception.InvalidNounceException;
-
 public class Library {
 
 	private ServerService server = null;
