@@ -1,5 +1,6 @@
 package pm;
 
+import java.io.Serializable;
 import java.math.BigInteger;
 import java.rmi.Naming;
 import java.rmi.RemoteException;
@@ -16,7 +17,9 @@ import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import javax.swing.plaf.synth.SynthSplitPaneUI;
 
-public class Library {
+public class Library implements Serializable{
+
+	private static final long serialVersionUID = 1L;
 
 	private ServerService server = null;
 
@@ -267,8 +270,6 @@ public class Library {
 
 			password_aux = firstDecipher.doFinal(passwordCipher);
 			nounceDeciphered = firstDecipher.doFinal(nounceEncryp);
-			
-			//System.out.println(new String(password_aux));
 			
 			// Decipher Password with Private Key
 			Cipher decipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");

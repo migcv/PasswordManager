@@ -321,7 +321,6 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 					
 					//System.out.println(new String(tripletList.get(i).getPassword()));
 					
-					
 					passwordCiphered = cipher.doFinal(tripletList.get(i).getPassword());
 					nounceCiphered = cipher.doFinal(nounce.toByteArray());
 
@@ -341,7 +340,7 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 					e.printStackTrace();
 				} catch (SignatureException e) {
 					e.printStackTrace();
-				} 
+				}
 
 				// Create List to send with [ password_ciphered, iv, signature,
 				// nounce ]
