@@ -273,6 +273,8 @@ public class Library {
 			BigInteger bg = new BigInteger(nounceDeciphered);
 
 			nouce = nouce.shiftLeft(2);
+			
+			System.out.println("1:  " + bg.compareTo(nouce));
 
 			if (!bg.equals(nouce)) {
 				throw new InvalidNounceException();
