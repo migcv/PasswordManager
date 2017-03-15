@@ -1,5 +1,7 @@
 package pm.test;
 
+import static org.junit.Assert.*;
+
 import java.io.UnsupportedEncodingException;
 import java.rmi.Naming;
 
@@ -9,7 +11,6 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-import junit.framework.Assert;
 import pm.Library;
 import pm.ServerService;
 
@@ -62,7 +63,7 @@ public class PMTest {
 		System.out.println(password);
 		System.out.println("Retrieve");
 		c.close();
-		Assert.assertEquals(password, "Macaco");
+		assertEquals(password, "Macaco");
 	}
 
 }
