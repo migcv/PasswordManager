@@ -1,10 +1,6 @@
 package pm;
 
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.ObjectOutputStream;
 import java.io.Serializable;
-import java.io.UnsupportedEncodingException;
 import java.math.BigInteger;
 import java.rmi.*;
 import java.rmi.server.*;
@@ -13,7 +9,6 @@ import java.security.InvalidKeyException;
 import java.security.Key;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
-import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
@@ -29,12 +24,9 @@ import java.util.Random;
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
 import javax.crypto.IllegalBlockSizeException;
-import javax.crypto.KeyGenerator;
 import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.IvParameterSpec;
-import javax.crypto.spec.SecretKeySpec;
-
 import pm.exception.DomainOrUsernameDoesntExistException;
 import pm.exception.InvalidNounceException;
 import pm.exception.PublicKeyDoesntExistException;
@@ -51,6 +43,8 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 	private Map<Key, ArrayList<Triplet>> publicKeyMap = new HashMap<Key, ArrayList<Triplet>>();
 
 	private Map<Key, SecretKey> sessionKeyMap = new HashMap<Key, SecretKey>();
+
+	Utils utl = new Utils();
 
 	protected Server() throws RemoteException {
 		super();
@@ -71,7 +65,7 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 	}
 
 	public ArrayList<byte[]> init(Key publicKey) throws RemoteException {
-		SecretKey sessionKey = createSessionKey();
+		SecretKey sessionKey = utl.createSessionKey();
 		sessionKeyMap.put(publicKey, sessionKey);
 		Cipher cipher;
 		byte[] sessionKeyCiphered = null, signature = null, nounceCiphered = null, iv = null;
@@ -164,7 +158,7 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 			byte[] n) throws RemoteException, PublicKeyDoesntExistException, SignatureWrongException {
 
 		// Verify Signature
-		if (!verifySignature(publicKey, signature, domain, username, password, iv)) {
+		if (!utl.verifySignature(publicKey, signature, domain, username, password, iv)) {
 			throw new SignatureWrongException();
 		}
 
@@ -213,16 +207,16 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 			// Verifies if the domain & username exists, if true, replace
 			// password with new one
 			if (Arrays.equals(tripletList.get(i).getDomain(),
-					diggestSalt(domainDeciphered, tripletList.get(i).getSalt()))
+					utl.diggestSalt(domainDeciphered, tripletList.get(i).getSalt()))
 					&& Arrays.equals(tripletList.get(i).getUsername(),
-							diggestSalt(usernameDeciphered, tripletList.get(i).getSalt()))) {
+							utl.diggestSalt(usernameDeciphered, tripletList.get(i).getSalt()))) {
 
 				SecureRandom random = new SecureRandom();
 				byte[] salt = new byte[64];
 				random.nextBytes(salt);
 
-				tripletList.get(i).setDomain(diggestSalt(domainDeciphered, salt));
-				tripletList.get(i).setUsername(diggestSalt(usernameDeciphered, salt));
+				tripletList.get(i).setDomain(utl.diggestSalt(domainDeciphered, salt));
+				tripletList.get(i).setUsername(utl.diggestSalt(usernameDeciphered, salt));
 				tripletList.get(i).setSalt(salt);
 
 				tripletList.get(i).setPassword(passwordDeciphered);
@@ -238,8 +232,8 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 			byte[] salt = new byte[64];
 			random.nextBytes(salt);
 
-			domainDeciphered = diggestSalt(domainDeciphered, salt);
-			usernameDeciphered = diggestSalt(usernameDeciphered, salt);
+			domainDeciphered = utl.diggestSalt(domainDeciphered, salt);
+			usernameDeciphered = utl.diggestSalt(usernameDeciphered, salt);
 
 			tripletList.add(new Triplet(domainDeciphered, usernameDeciphered, passwordDeciphered, salt));
 		}
@@ -253,7 +247,7 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 			throws RemoteException, PublicKeyDoesntExistException, DomainOrUsernameDoesntExistException,
 			SignatureWrongException {
 		// Verify Signature
-		if (!verifySignature(publicKey, signature, domain, username, iv)) {
+		if (!utl.verifySignature(publicKey, signature, domain, username, iv)) {
 			throw new SignatureWrongException();
 		}
 
@@ -303,9 +297,9 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 		for (int i = 0; i < tripletList.size(); i++) {
 			// Verifies if the domain & username exists, if true, sends password
 			if (Arrays.equals(tripletList.get(i).getDomain(),
-					diggestSalt(domainDeciphered, tripletList.get(i).getSalt()))
+					utl.diggestSalt(domainDeciphered, tripletList.get(i).getSalt()))
 					&& Arrays.equals(tripletList.get(i).getUsername(),
-							diggestSalt(usernameDeciphered, tripletList.get(i).getSalt()))) {
+							utl.diggestSalt(usernameDeciphered, tripletList.get(i).getSalt()))) {
 
 				try {
 					// Generate a random IV
@@ -347,7 +341,8 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 					e.printStackTrace();
 				}
 
-				// Create List to send with [ password_ciphered, iv, signature, nounce ]
+				// Create List to send with [ password_ciphered, iv, signature,
+				// nounce ]
 				ArrayList<byte[]> res = new ArrayList<byte[]>();
 				res.add(passwordCiphered);
 				res.add(iv);
@@ -363,7 +358,7 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 	// Funtion that signs data with Server's private key
 	public byte[] sign(byte[]... arrays) throws NoSuchAlgorithmException, InvalidKeyException, SignatureException {
 
-		byte[] toSend = concat(arrays);
+		byte[] toSend = utl.concat(arrays);
 
 		Signature rsaForSign = Signature.getInstance("SHA256withRSA");
 		rsaForSign.initSign(this.privateKey);
@@ -372,83 +367,4 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 		return signature;
 	}
 
-	// Generate a session key
-	private SecretKey createSessionKey() {
-		KeyGenerator keyGenerator;
-		SecretKey key = null;
-		try {
-			keyGenerator = KeyGenerator.getInstance("AES");
-			keyGenerator.init(256, new SecureRandom());
-			key = keyGenerator.generateKey();
-		} catch (NoSuchAlgorithmException e) {
-			e.printStackTrace();
-		}
-		return key;
-	}
-
-	// Checks if the signature is valid
-	private boolean verifySignature(Key publicKey, byte[] signature, byte[]... data) {
-		byte[] allData = concat(data);
-		boolean res = false;
-		try {
-			Signature rsaForVerify = Signature.getInstance("SHA256withRSA");
-			rsaForVerify.initVerify((PublicKey) publicKey);
-			rsaForVerify.update(allData);
-			res = rsaForVerify.verify(signature);
-		} catch (SignatureException e) {
-			e.printStackTrace();
-		} catch (InvalidKeyException e) {
-			e.printStackTrace();
-		} catch (NoSuchAlgorithmException e) {
-			e.printStackTrace();
-		}
-		return res;
-	}
-
-	private byte[] diggestSalt(byte[] content, byte[] salt) {
-		MessageDigest sha;
-		byte[] res = null;
-		try {
-			sha = MessageDigest.getInstance("SHA-256");
-			sha.update(concat(content, salt));
-			res = sha.digest();
-		} catch (NoSuchAlgorithmException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-		return res;
-	}
-
-	// Auxiliary function for verifySignature, to join all data received from
-	// the client
-	private byte[] concat(byte[]... arrays) {
-		// Determine the length of the result array
-		int totalLength = 0;
-		for (int i = 0; i < arrays.length; i++) {
-			totalLength += arrays[i].length;
-		}
-		// create the result array
-		byte[] result = new byte[totalLength];
-		// copy the source arrays into the result array
-		int currentIndex = 0;
-		for (int i = 0; i < arrays.length; i++) {
-			System.arraycopy(arrays[i], 0, result, currentIndex, arrays[i].length);
-			currentIndex += arrays[i].length;
-		}
-		return result;
-	}
-
-	// Saves the state of the server in file pmserver.ser
-	private void saveState() {
-		try {
-			FileOutputStream fileOut = new FileOutputStream("pmserver.ser");
-			ObjectOutputStream out = new ObjectOutputStream(fileOut);
-			out.writeObject(this);
-			out.close();
-			fileOut.close();
-			System.out.println("Serialized data is saved in pmserver.ser");
-		} catch (IOException i) {
-			i.printStackTrace();
-		}
-	}
 }

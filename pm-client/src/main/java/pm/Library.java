@@ -7,8 +7,6 @@ import java.security.*;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.ArrayList;
-import java.util.Random;
-
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
 import javax.crypto.IllegalBlockSizeException;
@@ -27,7 +25,7 @@ public class Library {
 
 	private PublicKey serverKey = null;
 	private SecretKey sessionKey = null;
-	
+
 	private BigInteger nouce = null;
 
 	public void init(char[] password, String alias, KeyStore... ks) {
@@ -36,6 +34,7 @@ public class Library {
 
 		// Initializes a connection to the Server
 		connectToServer();
+
 		// Generate a new key pair
 		if (ks.length == 0) {
 			try {
@@ -84,15 +83,15 @@ public class Library {
 
 			// Nounce
 			byte[] nounceCiphered = data.get(4);
-			
+
 			// Deciphering of the nounce
 			Cipher simetricCipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
 			simetricCipher.init(Cipher.DECRYPT_MODE, sessionKey, ivspec);
 			byte[] nounceDeciphered = simetricCipher.doFinal(nounceCiphered);
-			
+
 			nouce = new BigInteger(nounceDeciphered);
 			nouce = nouce.shiftLeft(2);
-			
+
 		} catch (RemoteException e) {
 			e.printStackTrace();
 		} catch (InvalidKeyException e) {
@@ -114,19 +113,19 @@ public class Library {
 
 	public void register_user() {
 
-		SecureRandom random = new SecureRandom();
-		byte[] iv = new byte[16];
-		random.nextBytes(iv);
-		IvParameterSpec ivspec = new IvParameterSpec(iv);
-		
 		try {
+
+			SecureRandom random = new SecureRandom();
+			byte[] iv = new byte[16];
+			random.nextBytes(iv);
+			IvParameterSpec ivspec = new IvParameterSpec(iv);
 			Cipher simetricCipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
 			simetricCipher.init(Cipher.ENCRYPT_MODE, sessionKey, ivspec);
 			byte[] nounceCiphered = simetricCipher.doFinal(nouce.toByteArray());
-			
+
 			server.register(ck.getPublicK(), nounceCiphered, iv);
 			System.out.println("register: user registered!");
-			
+
 		} catch (RemoteException e) {
 			e.printStackTrace();
 		} catch (IllegalBlockSizeException e) {
@@ -148,7 +147,7 @@ public class Library {
 	public void save_password(byte[] domain, byte[] username, byte[] password) {
 
 		byte[] passEncryp = null, domainEncry = null, usernameEncry = null, nounceCiphered = null;
-		
+
 		nouce = nouce.shiftLeft(2);
 
 		try {
@@ -246,8 +245,8 @@ public class Library {
 			iv = data.get(1);
 
 			ivspec = new IvParameterSpec(iv);
-			
-			//Extracting nounce
+
+			// Extracting nounce
 			nounceEncryp = data.get(3);
 			byte[] nounceDeciphered = null;
 
@@ -269,8 +268,7 @@ public class Library {
 			decipher.init(Cipher.DECRYPT_MODE, ck.getPrivateK());
 			password = decipher.doFinal(password_aux);
 
-			
-			//Verify nounce
+			// Verify nounce
 			BigInteger bg = new BigInteger(nounceDeciphered);
 
 			nouce = nouce.shiftLeft(2);
@@ -278,7 +276,7 @@ public class Library {
 			if (!bg.equals(nouce)) {
 				throw new InvalidNounceException();
 			}
-			
+
 		} catch (RemoteException e) {
 			e.printStackTrace();
 		} catch (IllegalBlockSizeException e) {
@@ -296,6 +294,7 @@ public class Library {
 		} catch (InvalidAlgorithmParameterException e) {
 			e.printStackTrace();
 		}
+
 		return password;
 	}
 
