@@ -17,6 +17,8 @@ import javax.crypto.SecretKey;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
+import pm.exception.InvalidNounceException;
+
 public class Library {
 
 	private ServerService server = null;
@@ -203,7 +205,7 @@ public class Library {
 
 	public byte[] retrieve_password(byte[] domain, byte[] username) {
 
-		byte[] password = null, password_aux = null, domainEncryp = null, usernameEncryp = null;
+		byte[] password = null, password_aux = null, domainEncryp = null, usernameEncryp = null, nounceEncryp = null;
 		ArrayList<byte[]> data = new ArrayList<byte[]>();
 
 		try {
@@ -223,14 +225,15 @@ public class Library {
 
 			domainEncryp = cipher.doFinal(domainHash);
 			usernameEncryp = cipher.doFinal(usernameHash);
+			nounceEncryp = cipher.doFinal(nouce.toByteArray());
 
 			// Signature of all data, E(H(domain)), E(H(username)) & IV
 			byte[] signature = ck.signature(domainEncryp, usernameEncryp, iv);
 
 			// Data sending ==> [ CKpub, E(H(domain)), E(H(username)), IV,
-			// signature ]
-			data = server.get(ck.getPublicK(), domainEncryp, usernameEncryp, iv, signature);
-			// Data received ==> [ password, iv, signature ]
+			// signature, nounce ]
+			data = server.get(ck.getPublicK(), domainEncryp, usernameEncryp, iv, signature, nounceEncryp);
+			// Data received ==> [ password, iv, signature, nounce ]
 
 			// Verifies Signature - verifySignature(public_key, signature,
 			// password, iv)
@@ -243,6 +246,10 @@ public class Library {
 			iv = data.get(1);
 
 			ivspec = new IvParameterSpec(iv);
+			
+			//Extracting nounce
+			nounceEncryp = data.get(3);
+			byte[] nounceDeciphered = null;
 
 			// Decipher password with Session Key
 			// COM CBC
@@ -255,12 +262,23 @@ public class Library {
 			firstDecipher.init(Cipher.DECRYPT_MODE, sessionKey);
 
 			password_aux = firstDecipher.doFinal(passwordCipher);
+			nounceDeciphered = firstDecipher.doFinal(nounceEncryp);
 
 			// Decipher Password with Private Key
 			Cipher decipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
 			decipher.init(Cipher.DECRYPT_MODE, ck.getPrivateK());
 			password = decipher.doFinal(password_aux);
 
+			
+			//Verify nounce
+			BigInteger bg = new BigInteger(nounceDeciphered);
+
+			nouce = nouce.shiftLeft(2);
+
+			if (!bg.equals(nouce)) {
+				throw new InvalidNounceException();
+			}
+			
 		} catch (RemoteException e) {
 			e.printStackTrace();
 		} catch (IllegalBlockSizeException e) {

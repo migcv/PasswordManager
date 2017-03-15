@@ -249,7 +249,7 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 		// saveState();
 	}
 
-	public ArrayList<byte[]> get(Key publicKey, byte[] domain, byte[] username, byte[] iv, byte[] signature)
+	public ArrayList<byte[]> get(Key publicKey, byte[] domain, byte[] username, byte[] iv, byte[] signature, byte[] n)
 			throws RemoteException, PublicKeyDoesntExistException, DomainOrUsernameDoesntExistException,
 			SignatureWrongException {
 		// Verify Signature
@@ -257,7 +257,7 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 			throw new SignatureWrongException();
 		}
 
-		byte[] domainDeciphered = null, usernameDeciphered = null, signatureToSend = null;
+		byte[] domainDeciphered = null, usernameDeciphered = null, signatureToSend = null, nounceDeciphered = null;
 
 		// Decipher content
 		try {
@@ -266,6 +266,7 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 			cipher.init(Cipher.DECRYPT_MODE, sessionKeyMap.get(publicKey), ivspec);
 			domainDeciphered = cipher.doFinal(domain);
 			usernameDeciphered = cipher.doFinal(username);
+			nounceDeciphered = cipher.doFinal(n);
 		} catch (IllegalBlockSizeException e) {
 			e.printStackTrace();
 		} catch (BadPaddingException e) {
@@ -280,7 +281,18 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 			e.printStackTrace();
 		}
 
+		BigInteger bg = new BigInteger(nounceDeciphered);
+
+		nounce = nounce.shiftLeft(2);
+
+		if (!bg.equals(nounce)) {
+			throw new InvalidNounceException();
+		}
+
+		nounce = nounce.shiftLeft(2);
+
 		byte[] passwordCiphered = null;
+		byte[] nounceCiphered = null;
 		ArrayList<Triplet> tripletList = publicKeyMap.get(publicKey);
 
 		// Verifies if the publicKey exists
@@ -315,6 +327,7 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 					cipher.init(Cipher.ENCRYPT_MODE, sessionKeyMap.get(publicKey));
 
 					passwordCiphered = cipher.doFinal(tripletList.get(i).getPassword());
+					nounceCiphered = cipher.doFinal(nounce.toByteArray());
 
 					// Signature contaning [ password, iv ] signed with Server's
 					// private key
@@ -334,12 +347,12 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 					e.printStackTrace();
 				}
 
-				// Create List to send with [ password_ciphered, iv, signature ]
+				// Create List to send with [ password_ciphered, iv, signature, nounce ]
 				ArrayList<byte[]> res = new ArrayList<byte[]>();
 				res.add(passwordCiphered);
 				res.add(iv);
 				res.add(signatureToSend);
-
+				res.add(nounceCiphered);
 				return res;
 			}
 		}
