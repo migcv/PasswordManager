@@ -90,7 +90,6 @@ public class Library {
 			byte[] nounceDeciphered = simetricCipher.doFinal(nounceCiphered);
 
 			nouce = new BigInteger(nounceDeciphered);
-			nouce = nouce.shiftLeft(2);
 
 		} catch (RemoteException e) {
 			e.printStackTrace();
@@ -113,8 +112,9 @@ public class Library {
 
 	public void register_user() {
 
+		
 		try {
-
+			nouce = nouce.shiftLeft(2);
 			SecureRandom random = new SecureRandom();
 			byte[] iv = new byte[16];
 			random.nextBytes(iv);
@@ -206,7 +206,9 @@ public class Library {
 
 		byte[] password = null, password_aux = null, domainEncryp = null, usernameEncryp = null, nounceEncryp = null;
 		ArrayList<byte[]> data = new ArrayList<byte[]>();
-
+		
+		nouce = nouce.shiftLeft(2);
+		
 		try {
 			// Generate a random IV
 			SecureRandom random = new SecureRandom();
@@ -229,8 +231,7 @@ public class Library {
 			// Signature of all data, E(H(domain)), E(H(username)) & IV
 			byte[] signature = ck.signature(domainEncryp, usernameEncryp, iv);
 
-			// Data sending ==> [ CKpub, E(H(domain)), E(H(username)), IV,
-			// signature, nounce ]
+			// Data sending ==> [ CKpub, E(H(domain)), E(H(username)), IV, signature, nounce ]
 			data = server.get(ck.getPublicK(), domainEncryp, usernameEncryp, iv, signature, nounceEncryp);
 			// Data received ==> [ password, iv, signature, nounce ]
 

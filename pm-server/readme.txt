@@ -1,5 +1,5 @@
-Instructions using Maven:
-------------------------
+Instructions using Maven — Server:
+——————————————————————————————————
 
 To compile and copy the properties file to the output directory:
   mvn compile

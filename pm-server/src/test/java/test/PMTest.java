@@ -2,12 +2,17 @@ package test;
 
 import java.rmi.Naming;
 
+import org.junit.After;
+import org.junit.AfterClass;
+import org.junit.Before;
+import org.junit.BeforeClass;
+
 import pm.ServerService;
 
 public class PMTest {
 
-	/*private static ServerService server = null;
-	
+	private static ServerService server = null;
+
 	@BeforeClass
 	public static void oneTimeSetUp() {
 		if (System.getSecurityManager() == null) {
@@ -39,18 +44,16 @@ public class PMTest {
 	public void tearDown() {
 	}
 
-	@Test
-	public void sucess() {
-		
-		Library c = new Library();
-		c.init("password".toCharArray(), "alias");
-		System.out.println("Init");
-		c.register_user();
-		System.out.println("Register");
-		c.save_password("www.google.com".getBytes(), "Miguel".getBytes(), "Macaco".getBytes());
-		System.out.println("Save");
-		System.out.println(new String(c.retrieve_password("www.google.com".getBytes(), "Miguel".getBytes()), "UTF-8"));
-		System.out.println("Retrieve");
-		c.close();
-	}*/
+	/*
+	 * @Test public void sucess() {
+	 * 
+	 * Library c = new Library(); c.init("password".toCharArray(), "alias");
+	 * System.out.println("Init"); c.register_user();
+	 * System.out.println("Register");
+	 * c.save_password("www.google.com".getBytes(), "Miguel".getBytes(),
+	 * "Macaco".getBytes()); System.out.println("Save"); System.out.println(new
+	 * String(c.retrieve_password("www.google.com".getBytes(),
+	 * "Miguel".getBytes()), "UTF-8")); System.out.println("Retrieve");
+	 * c.close(); }
+	 */
 }

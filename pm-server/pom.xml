@@ -14,7 +14,31 @@
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <mainclass>pm.ServerMain</mainclass>
+    <version.jmockit>1.30</version.jmockit>
+	<version.junit>4.12</version.junit>
   </properties>
+  
+  <dependencies>
+    <dependency>
+      <groupId>pm</groupId>
+      <artifactId>pm-client</artifactId>
+      <version>1.0-SNAPSHOT</version>
+    </dependency>
+     <!-- JMockit - must appear before JUnit -->
+     <dependency>
+     	<groupId>org.jmockit</groupId>
+        <artifactId>jmockit</artifactId>
+        <version>${version.jmockit}</version>
+        <scope>test</scope>
+     </dependency>
+     <!-- JUnit -->
+     <dependency>
+     	<groupId>junit</groupId>
+        <artifactId>junit</artifactId>
+        <version>${version.junit}</version>
+        <scope>test</scope>
+     </dependency>
+  </dependencies>
 
   <build>
     <plugins>
