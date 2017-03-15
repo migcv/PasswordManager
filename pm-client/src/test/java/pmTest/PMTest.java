@@ -1,4 +1,4 @@
-package pm.test;
+package pmTest;
 
 import static org.junit.Assert.*;
 

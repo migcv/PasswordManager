@@ -14,6 +14,7 @@ import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
+import javax.swing.plaf.synth.SynthSplitPaneUI;
 
 public class Library {
 
@@ -178,6 +179,7 @@ public class Library {
 			usernameEncry = simetricCipher.doFinal(usernameHash);
 			nounceCiphered = simetricCipher.doFinal(nounce.toByteArray());
 
+			
 			// Signature of all data [ E(H(domain)), E(H(username)),
 			// E(E(password)) & IV ]
 			byte[] signature = ck.signature(domainEncry, usernameEncry, passEncryp, iv);
@@ -256,9 +258,8 @@ public class Library {
 
 			// Decipher password with Session Key
 			// COM CBC
-			// Cipher firstDecipher =
-			// Cipher.getInstance("AES/CBC/PKCS5Padding");
-			// firstDecipher.init(Cipher.DECRYPT_MODE, sessionKey, ivspec);
+			//Cipher firstDecipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+			//firstDecipher.init(Cipher.DECRYPT_MODE, sessionKey, ivspec);
 
 			// COM ECB
 			Cipher firstDecipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
@@ -266,7 +267,9 @@ public class Library {
 
 			password_aux = firstDecipher.doFinal(passwordCipher);
 			nounceDeciphered = firstDecipher.doFinal(nounceEncryp);
-
+			
+			//System.out.println(new String(password_aux));
+			
 			// Decipher Password with Private Key
 			Cipher decipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
 			decipher.init(Cipher.DECRYPT_MODE, ck.getPrivateK());

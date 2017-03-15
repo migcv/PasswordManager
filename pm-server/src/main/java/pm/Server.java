@@ -309,17 +309,19 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 					IvParameterSpec ivspec = new IvParameterSpec(res_iv);
 
 					// Cipher password with session key
-
+					
 					// COM CBC
-					// Cipher cipher =
-					// Cipher.getInstance("AES/CBC/PKCS5Padding");
-					// cipher.init(Cipher.ENCRYPT_MODE,
-					// sessionKeyMap.get(publicKey), ivspec);
+					//Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+					//cipher.init(Cipher.ENCRYPT_MODE, sessionKeyMap.get(publicKey), ivspec);
 
 					// COM ECB
 					Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
 					cipher.init(Cipher.ENCRYPT_MODE, sessionKeyMap.get(publicKey));
-
+					
+					
+					//System.out.println(new String(tripletList.get(i).getPassword()));
+					
+					
 					passwordCiphered = cipher.doFinal(tripletList.get(i).getPassword());
 					nounceCiphered = cipher.doFinal(nounce.toByteArray());
 
@@ -339,7 +341,7 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 					e.printStackTrace();
 				} catch (SignatureException e) {
 					e.printStackTrace();
-				}
+				} 
 
 				// Create List to send with [ password_ciphered, iv, signature,
 				// nounce ]
