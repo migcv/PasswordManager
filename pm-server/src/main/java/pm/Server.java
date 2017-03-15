@@ -77,7 +77,7 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 		byte[] sessionKeyCiphered = null, signature = null, nounceCiphered = null, iv = null;
 
 		Random rand = new SecureRandom();
-		BigInteger nounce = new BigInteger(30000, rand);
+		this.nounce = new BigInteger(30000, rand);
 
 		try {
 			// Cipher Session Key with Client's public key
@@ -136,7 +136,7 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 			
 			BigInteger bg = new BigInteger(nounceDecipher);
 			
-			if(bg != nounce.shiftLeft(2)){
+			if(!bg.equals(nounce.shiftLeft(2))){
 				throw new InvalidNounceException();
 			}
 			
