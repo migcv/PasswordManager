@@ -1,12 +1,5 @@
 package pm;
 
-import java.rmi.Naming;
-import java.security.Provider;
-import java.security.Security;
-import java.util.Enumeration;
-
-import pm.ServerService;
-
 public class Client {
 
 	public static void main(String[] args) throws Exception {
