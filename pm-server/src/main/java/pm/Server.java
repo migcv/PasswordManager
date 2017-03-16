@@ -275,6 +275,69 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 			domainDeciphered = cipher.doFinal(domain);
 			usernameDeciphered = cipher.doFinal(username);
 			nounceDeciphered = cipher.doFinal(n);
+
+			BigInteger bg = new BigInteger(nounceDeciphered);
+	
+			nounce = nounce.shiftLeft(2);
+	
+			if (!bg.equals(nounce)) {
+				throw new InvalidNounceException();
+			}
+	
+			nounce = nounce.shiftLeft(2);
+	
+			byte[] passwordCiphered = null;
+			byte[] nounceCiphered = null;
+			ArrayList<Triplet> tripletList = publicKeyMap.get(publicKey);
+	
+			// Verifies if the publicKey exists
+			if (tripletList == null) {
+				throw new PublicKeyDoesntExistException();
+			}
+	
+			for (int i = 0; i < tripletList.size(); i++) {
+				// Verifies if the domain & username exists, if true, sends password
+				if (Arrays.equals(tripletList.get(i).getDomain(),
+					utl.diggestSalt(domainDeciphered, tripletList.get(i).getSalt()))
+					&& Arrays.equals(tripletList.get(i).getUsername(),
+							utl.diggestSalt(usernameDeciphered, tripletList.get(i).getSalt()))) {
+
+					// Generate a random IV
+					SecureRandom random = new SecureRandom();
+					byte[] res_iv = new byte[16];
+					random.nextBytes(iv);
+					ivspec = new IvParameterSpec(res_iv);
+
+					// Cipher password with session key
+					
+					// COM CBC
+					//Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+					//cipher.init(Cipher.ENCRYPT_MODE, sessionKeyMap.get(publicKey), ivspec);
+
+					// COM ECB
+					cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
+					cipher.init(Cipher.ENCRYPT_MODE, sessionKeyMap.get(publicKey));
+					
+					
+					//System.out.println(new String(tripletList.get(i).getPassword()));
+					
+					passwordCiphered = cipher.doFinal(tripletList.get(i).getPassword());
+					nounceCiphered = cipher.doFinal(nounce.toByteArray());
+
+					// Signature contaning [ password, iv ] signed with Server's
+					// private key
+					signatureToSend = sign(passwordCiphered, iv);
+	
+					// Create List to send with [ password_ciphered, iv, signature,
+					// nounce ]
+					ArrayList<byte[]> res = new ArrayList<byte[]>();
+					res.add(passwordCiphered);
+					res.add(iv);
+					res.add(signatureToSend);
+					res.add(nounceCiphered);
+					return res;
+				}
+			}
 		} catch (IllegalBlockSizeException e) {
 			e.printStackTrace();
 		} catch (BadPaddingException e) {
@@ -287,84 +350,8 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 			e.printStackTrace();
 		} catch (NoSuchPaddingException e) {
 			e.printStackTrace();
-		}
-
-		BigInteger bg = new BigInteger(nounceDeciphered);
-
-		nounce = nounce.shiftLeft(2);
-
-		if (!bg.equals(nounce)) {
-			throw new InvalidNounceException();
-		}
-
-		nounce = nounce.shiftLeft(2);
-
-		byte[] passwordCiphered = null;
-		byte[] nounceCiphered = null;
-		ArrayList<Triplet> tripletList = publicKeyMap.get(publicKey);
-
-		// Verifies if the publicKey exists
-		if (tripletList == null) {
-			throw new PublicKeyDoesntExistException();
-		}
-
-		for (int i = 0; i < tripletList.size(); i++) {
-			// Verifies if the domain & username exists, if true, sends password
-			if (Arrays.equals(tripletList.get(i).getDomain(),
-					utl.diggestSalt(domainDeciphered, tripletList.get(i).getSalt()))
-					&& Arrays.equals(tripletList.get(i).getUsername(),
-							utl.diggestSalt(usernameDeciphered, tripletList.get(i).getSalt()))) {
-
-				try {
-					// Generate a random IV
-					SecureRandom random = new SecureRandom();
-					byte[] res_iv = new byte[16];
-					random.nextBytes(iv);
-					IvParameterSpec ivspec = new IvParameterSpec(res_iv);
-
-					// Cipher password with session key
-					
-					// COM CBC
-					//Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-					//cipher.init(Cipher.ENCRYPT_MODE, sessionKeyMap.get(publicKey), ivspec);
-
-					// COM ECB
-					Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
-					cipher.init(Cipher.ENCRYPT_MODE, sessionKeyMap.get(publicKey));
-					
-					
-					//System.out.println(new String(tripletList.get(i).getPassword()));
-					
-					passwordCiphered = cipher.doFinal(tripletList.get(i).getPassword());
-					nounceCiphered = cipher.doFinal(nounce.toByteArray());
-
-					// Signature contaning [ password, iv ] signed with Server's
-					// private key
-					signatureToSend = sign(passwordCiphered, iv);
-
-				} catch (IllegalBlockSizeException e) {
-					e.printStackTrace();
-				} catch (BadPaddingException e) {
-					e.printStackTrace();
-				} catch (InvalidKeyException e) {
-					e.printStackTrace();
-				} catch (NoSuchAlgorithmException e) {
-					e.printStackTrace();
-				} catch (NoSuchPaddingException e) {
-					e.printStackTrace();
-				} catch (SignatureException e) {
-					e.printStackTrace();
-				} 
-
-				// Create List to send with [ password_ciphered, iv, signature,
-				// nounce ]
-				ArrayList<byte[]> res = new ArrayList<byte[]>();
-				res.add(passwordCiphered);
-				res.add(iv);
-				res.add(signatureToSend);
-				res.add(nounceCiphered);
-				return res;
-			}
+		} catch (SignatureException e) {
+			e.printStackTrace();
 		}
 
 		throw new DomainOrUsernameDoesntExistException();
@@ -383,17 +370,17 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 	}
 	
 	// Saves the state of the server in file pmserver.ser
-		public void saveState() {
-			try {
-				FileOutputStream fileOut = new FileOutputStream("pmserver.ser");
-				ObjectOutputStream out = new ObjectOutputStream(fileOut);
-				out.writeObject(this);
-				out.close();
-				fileOut.close();
-				System.out.println("Serialized data is saved in pmserver.ser");
-			} catch (IOException i) {
-				i.printStackTrace();
-			}
+	public void saveState() {
+		try {
+			FileOutputStream fileOut = new FileOutputStream("pmserver.ser");
+			ObjectOutputStream out = new ObjectOutputStream(fileOut);
+			out.writeObject(this);
+			out.close();
+			fileOut.close();
+			System.out.println("Serialized data is saved in pmserver.ser");
+		} catch (IOException i) {
+			i.printStackTrace();
 		}
+	}
 
 }
