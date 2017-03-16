@@ -65,6 +65,12 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 	}
 
 	public ArrayList<byte[]> init(Key publicKey, byte[] sig) throws RemoteException {
+		
+		// Verify Signature
+		if (!utl.verifySignature(publicKey, sig, publicKey.getEncoded())) {
+			throw new SignatureWrongException();
+		}
+		
 		SecretKey sessionKey = utl.createSessionKey();
 		sessionKeyMap.put(publicKey, sessionKey);
 		Cipher cipher;
@@ -79,10 +85,6 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 			cipher.init(Cipher.ENCRYPT_MODE, publicKey);
 			sessionKeyCiphered = cipher.doFinal(sessionKey.getEncoded());
 
-			// Signature contaning [ Session Key ] signed with Server's private
-			// key
-			signature = sign(sessionKeyCiphered);
-
 			// Generate a random IV
 			SecureRandom random = new SecureRandom();
 			iv = new byte[16];
@@ -92,6 +94,10 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 			cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
 			cipher.init(Cipher.ENCRYPT_MODE, sessionKeyMap.get(publicKey), ivspec);
 			nounceCiphered = cipher.doFinal(nounce.toByteArray());
+			
+			// Signature contaning [ Session Key ] signed with Server's private
+			// key
+			signature = sign(this.publicKey.getEncoded(), sessionKeyCiphered, nounceCiphered, iv);
 
 		} catch (NoSuchAlgorithmException e) {
 			e.printStackTrace();
@@ -112,21 +118,26 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 		ArrayList<byte[]> res = new ArrayList<byte[]>();
 		res.add(this.publicKey.getEncoded());
 		res.add(sessionKeyCiphered);
-		res.add(signature);
-		res.add(iv);
 		res.add(nounceCiphered);
+		res.add(iv);
+		res.add(signature);
 		return res;
 	}
 
-	public void register(Key publicKey, byte[] n, byte[] iv) throws RemoteException {
-
+	public void register(Key publicKey, byte[] nonce, byte[] iv, byte[] signature) throws RemoteException {
+		
+		// Verify Signature
+		if (!utl.verifySignature(publicKey, signature, publicKey.getEncoded(), nonce, iv)) {
+			throw new SignatureWrongException();
+		}
+		
 		IvParameterSpec ivspec = new IvParameterSpec(iv);
 
 		byte[] nounceDecipher;
 		try {
 			Cipher decipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
 			decipher.init(Cipher.DECRYPT_MODE, sessionKeyMap.get(publicKey), ivspec);
-			nounceDecipher = decipher.doFinal(n);
+			nounceDecipher = decipher.doFinal(nonce);
 
 			BigInteger bg = new BigInteger(nounceDecipher);
 

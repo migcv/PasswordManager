@@ -57,14 +57,14 @@ public class Library implements Serializable{
 		}
 
 		try {
-			// data ==> [ Server_Public_Key, Session_Key, Signature ]
+			// data ==> [ Server_Public_Key, Session_Key, Nonce, IV, Signature ]
 			ArrayList<byte[]> data = server.init(ck.getPublicK(), ck.signature(ck.getPublicK().getEncoded()));
 
 			// Server's public key
 			serverKey = KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(data.get(0)));
 
-			// Verifies Signature
-			if (!ck.verifySignature(serverKey, data.get(2), data.get(1))) {
+			// Verifies Signature verifySignature(SK_pub, signature, SK_pub, Ks, Nonce, IV)
+			if (!ck.verifySignature(serverKey, data.get(4), data.get(0), data.get(1), data.get(2), data.get(3))) {
 				System.out.println("init: signature wrong!");
 				return;
 			}
@@ -84,7 +84,7 @@ public class Library implements Serializable{
 			IvParameterSpec ivspec = new IvParameterSpec(iv);
 
 			// Nounce
-			byte[] nounceCiphered = data.get(4);
+			byte[] nounceCiphered = data.get(2);
 
 			// Deciphering of the nounce
 			Cipher simetricCipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
@@ -109,6 +109,8 @@ public class Library implements Serializable{
 			e.printStackTrace();
 		} catch (InvalidAlgorithmParameterException e) {
 			e.printStackTrace();
+		} catch (SignatureException e) {
+			e.printStackTrace();
 		}
 	}
 
@@ -130,7 +132,9 @@ public class Library implements Serializable{
 			
 			byte[] nounceCiphered = simetricCipher.doFinal(nounce.toByteArray());
 
-			server.register(ck.getPublicK(), nounceCiphered, iv);
+			byte[] signature = ck.signature(ck.getPublicK().getEncoded(), nounceCiphered, iv);
+			
+			server.register(ck.getPublicK(), nounceCiphered, iv, signature);
 			System.out.println("register: user registered!");
 
 		} catch (RemoteException e) {
@@ -146,6 +150,8 @@ public class Library implements Serializable{
 		} catch (NoSuchAlgorithmException e) {
 			e.printStackTrace();
 		} catch (NoSuchPaddingException e) {
+			e.printStackTrace();
+		} catch (SignatureException e) {
 			e.printStackTrace();
 		}
 
