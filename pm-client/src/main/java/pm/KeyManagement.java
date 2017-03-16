@@ -67,7 +67,7 @@ public class KeyManagement {
 		byte[] signature = rsaForSign.sign();
 		return signature;
 	}
-	
+
 	public boolean verifySignature(Key publicKey, byte[] signature, byte[]... data) {
 		byte[] allData = concat(data);
 		boolean res = false;

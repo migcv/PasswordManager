@@ -23,7 +23,7 @@ public class Utils {
 		SecretKey key = null;
 		try {
 			keyGenerator = KeyGenerator.getInstance("AES");
-			keyGenerator.init(256, new SecureRandom());
+			keyGenerator.init(128, new SecureRandom());
 			key = keyGenerator.generateKey();
 		} catch (NoSuchAlgorithmException e) {
 			e.printStackTrace();

@@ -259,14 +259,15 @@ public class Library implements Serializable{
 			nounceEncryp = data.get(3);
 			byte[] nounceDeciphered = null;
 
-			// Decipher password with Session Key
-			// COM CBC
-			//Cipher firstDecipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-			//firstDecipher.init(Cipher.DECRYPT_MODE, sessionKey, ivspec);
+			// Decipher password with Session Key 
+			
+			//COM CBC
+			Cipher firstDecipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+			firstDecipher.init(Cipher.DECRYPT_MODE, sessionKey, ivspec);
 
 			// COM ECB
-			Cipher firstDecipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
-			firstDecipher.init(Cipher.DECRYPT_MODE, sessionKey);
+			//Cipher firstDecipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
+			//firstDecipher.init(Cipher.DECRYPT_MODE, sessionKey);
 
 			password_aux = firstDecipher.doFinal(passwordCipher);
 			nounceDeciphered = firstDecipher.doFinal(nounceEncryp);
