@@ -50,7 +50,7 @@ public class GenCert {
 		ks.setKeyEntry(alias, pair.getPrivate(), password, new java.security.cert.Certificate[] { cert });
 		
 		//Create a new file to store the KeyStore object
-		FileOutputStream fos = new FileOutputStream("keystorefile.jce");
+		FileOutputStream fos = new FileOutputStream("keystorefile "+ alias + ".jce");
 		//Write the KeyStore into the file
 		ks.store(fos, password);
 		//Close the file stream
