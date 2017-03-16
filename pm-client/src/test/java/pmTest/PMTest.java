@@ -76,6 +76,26 @@ public class PMTest {
 		assertFalse(pass1.equals(pass2));
 	}
 
+	@Test
+	public void sucessTwoUsers(){
+
+		Library c = new Library();
+		c.init("password".toCharArray(), "alias");
+		c.register_user();
+		c.save_password("www.google.com".getBytes(), "Alice".getBytes(), "SEC_16_17".getBytes());
+		c.retrieve_password("www.google.com".getBytes(), "Alice".getBytes());
+		c.close();
+		
+		Library c1 = new Library();
+		c1.init("password1".toCharArray(), "alias1");
+		c1.register_user();
+		c1.save_password("www.google.com".getBytes(), "Bob".getBytes(), "SEC".getBytes());
+		c1.retrieve_password("www.google.com".getBytes(), "Bob".getBytes());
+		c1.close();
+		
+		
+		assertFalse(c == c1);
+	}
 	@Test(expected = DomainOrUsernameDoesntExistException.class)
 	public void UsernameDoesNotExists() {
 		
