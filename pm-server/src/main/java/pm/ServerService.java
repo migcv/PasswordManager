@@ -10,10 +10,9 @@ public interface ServerService extends Remote {
 
 	public void register(Key publicKey, byte[] n, byte[] iv, byte[] signature) throws RemoteException;
 
-	public void put(Key publicKey, byte[] domain, byte[] username, byte[] password, byte[] iv, byte[] signature,
-			byte[] n) throws RemoteException;
+	public void put(Key publicKey, byte[] domain, byte[] username, byte[] password, byte[] iv, byte[] n, byte[] signature) throws RemoteException;
 
-	public ArrayList<byte[]> get(Key publicKey, byte[] domain, byte[] username, byte[] iv, byte[] signature, byte[] n)
+	public ArrayList<byte[]> get(Key publicKey, byte[] domain, byte[] username, byte[] iv, byte[] n, byte[] signature)
 			throws RemoteException;
 
 }

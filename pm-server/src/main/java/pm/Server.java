@@ -98,7 +98,7 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 			cipher.init(Cipher.ENCRYPT_MODE, sessionKeyMap.get(publicKey), ivspec);
 			nounceCiphered = cipher.doFinal(nounce.toByteArray());
 			
-			// Signature contaning [ Session Key ] signed with Server's private
+			// Signature contaning [ Public Key, Session Key, Nonce, IV ] signed with Server's private
 			// key
 			signature = sign(this.publicKey.getEncoded(), sessionKeyCiphered, nounceCiphered, iv);
 
@@ -168,8 +168,7 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 
 	}
 
-	public void put(Key publicKey, byte[] domain, byte[] username, byte[] password, byte[] iv, byte[] signature,
-			byte[] n) throws RemoteException, PublicKeyDoesntExistException, SignatureWrongException {
+	public void put(Key publicKey, byte[] domain, byte[] username, byte[] password, byte[] iv, byte[] n, byte[] signature) throws RemoteException, PublicKeyDoesntExistException, SignatureWrongException {
 
 		// Verify Signature
 		if (!utl.verifySignature(publicKey, signature, domain, username, password, iv)) {
@@ -257,11 +256,11 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 		saveState();
 	}
 
-	public ArrayList<byte[]> get(Key publicKey, byte[] domain, byte[] username, byte[] iv, byte[] signature, byte[] n)
+	public ArrayList<byte[]> get(Key publicKey, byte[] domain, byte[] username, byte[] iv,  byte[] n, byte[] signature)
 			throws RemoteException, PublicKeyDoesntExistException, DomainOrUsernameDoesntExistException,
 			SignatureWrongException {
 		// Verify Signature
-		if (!utl.verifySignature(publicKey, signature, domain, username, iv)) {
+		if (!utl.verifySignature(publicKey, signature, publicKey.getEncoded(), domain, username, n, iv)) {
 			throw new SignatureWrongException();
 		}
 
@@ -324,17 +323,16 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 					passwordCiphered = cipher.doFinal(tripletList.get(i).getPassword());
 					nounceCiphered = cipher.doFinal(nounce.toByteArray());
 
-					// Signature contaning [ password, iv ] signed with Server's
-					// private key
-					signatureToSend = sign(passwordCiphered, iv);
+					// Signature contaning [ password, nonce, iv ] signed with Server's private key
+					signatureToSend = sign(passwordCiphered, nounceCiphered, iv);
 	
 					// Create List to send with [ password_ciphered, iv, signature,
 					// nounce ]
 					ArrayList<byte[]> res = new ArrayList<byte[]>();
 					res.add(passwordCiphered);
+					res.add(nounceCiphered);
 					res.add(iv);
 					res.add(signatureToSend);
-					res.add(nounceCiphered);
 					return res;
 				}
 			}

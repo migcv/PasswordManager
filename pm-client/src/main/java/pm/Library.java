@@ -199,9 +199,8 @@ public class Library implements Serializable {
 			// E(E(password)) & IV ]
 			byte[] signature = ck.signature(domainEncry, usernameEncry, passEncryp, iv);
 
-			// Data sending ==> [ CKpub, E(H(domain)), E(H(username)),
-			// E(E(password)), IV, signature ]
-			server.put(ck.getPublicK(), domainEncry, usernameEncry, passEncryp, iv, signature, nounceCiphered);
+			// Data sending ==> [ CKpub, E(H(domain)), E(H(username)), E(E(password)), IV, signature ]
+			server.put(ck.getPublicK(), domainEncry, usernameEncry, passEncryp, iv, nounceCiphered, signature);
 
 		} catch (RemoteException e) {
 			e.printStackTrace();
@@ -248,28 +247,26 @@ public class Library implements Serializable {
 			usernameEncryp = cipher.doFinal(usernameHash);
 			nounceEncryp = cipher.doFinal(nounce.toByteArray());
 
-			// Signature of all data, E(H(domain)), E(H(username)) & IV
-			byte[] signature = ck.signature(domainEncryp, usernameEncryp, iv);
+			// Signature of all data Public_Key, E(H(domain)), E(H(username)), E(Nonce) & IV
+			byte[] signature = ck.signature(ck.getPublicK().getEncoded(), domainEncryp, usernameEncryp, nounceEncryp, iv);
 
-			// Data sending ==> [ CKpub, E(H(domain)), E(H(username)), IV,
-			// signature, nounce ]
-			data = server.get(ck.getPublicK(), domainEncryp, usernameEncryp, iv, signature, nounceEncryp);
-			// Data received ==> [ password, iv, signature, nounce ]
+			// Data sending ==> [ CKpub, E(H(domain)), E(H(username)), IV, nounce, signature ]
+			data = server.get(ck.getPublicK(), domainEncryp, usernameEncryp, iv, nounceEncryp, signature);
+			// Data received ==> [ password, nounce, iv, signature ]
 
-			// Verifies Signature - verifySignature(public_key, signature,
-			// password, iv)
-			if (!ck.verifySignature(serverKey, data.get(2), data.get(0), data.get(1))) {
+			// Verifies Signature - verifySignature(public_key, signature, password, nonce, iv)
+			if (!ck.verifySignature(serverKey, data.get(3), data.get(0), data.get(1), data.get(2))) {
 				throw new SignatureWrongException();
 			}
 
 			// Extracting IV
 			byte[] passwordCipher = data.get(0);
-			iv = data.get(1);
+			iv = data.get(2);
 
 			ivspec = new IvParameterSpec(iv);
 
 			// Extracting nounce
-			nounceEncryp = data.get(3);
+			nounceEncryp = data.get(1);
 			byte[] nounceDeciphered = null;
 
 			// Decipher password with Session Key
