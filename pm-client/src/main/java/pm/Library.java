@@ -15,9 +15,8 @@ import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
-import javax.swing.plaf.synth.SynthSplitPaneUI;
 
-public class Library implements Serializable{
+public class Library implements Serializable {
 
 	private static final long serialVersionUID = 1L;
 
@@ -63,7 +62,8 @@ public class Library implements Serializable{
 			// Server's public key
 			serverKey = KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(data.get(0)));
 
-			// Verifies Signature verifySignature(SK_pub, signature, SK_pub, Ks, Nonce, IV)
+			// Verifies Signature verifySignature(SK_pub, signature, SK_pub, Ks,
+			// Nonce, IV)
 			if (!ck.verifySignature(serverKey, data.get(4), data.get(0), data.get(1), data.get(2), data.get(3))) {
 				System.out.println("init: signature wrong!");
 				return;
@@ -116,24 +116,23 @@ public class Library implements Serializable{
 
 	public void register_user() {
 
-		
 		try {
 			SecureRandom random = new SecureRandom();
 			byte[] iv = new byte[16];
 			random.nextBytes(iv);
 			IvParameterSpec ivspec = new IvParameterSpec(iv);
-			
+
 			// Increment nounce
 			nounce = nounce.shiftLeft(2);
-			
+
 			// Cipher nounce
 			Cipher simetricCipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
 			simetricCipher.init(Cipher.ENCRYPT_MODE, sessionKey, ivspec);
-			
+
 			byte[] nounceCiphered = simetricCipher.doFinal(nounce.toByteArray());
 
 			byte[] signature = ck.signature(ck.getPublicK().getEncoded(), nounceCiphered, iv);
-			
+
 			server.register(ck.getPublicK(), nounceCiphered, iv, signature);
 			System.out.println("register: user registered!");
 
@@ -188,7 +187,6 @@ public class Library implements Serializable{
 			usernameEncry = simetricCipher.doFinal(usernameHash);
 			nounceCiphered = simetricCipher.doFinal(nounce.toByteArray());
 
-			
 			// Signature of all data [ E(H(domain)), E(H(username)),
 			// E(E(password)) & IV ]
 			byte[] signature = ck.signature(domainEncry, usernameEncry, passEncryp, iv);
@@ -220,9 +218,9 @@ public class Library implements Serializable{
 
 		byte[] password = null, password_aux = null, domainEncryp = null, usernameEncryp = null, nounceEncryp = null;
 		ArrayList<byte[]> data = new ArrayList<byte[]>();
-		
+
 		nounce = nounce.shiftLeft(2);
-		
+
 		try {
 			// Generate a random IV
 			SecureRandom random = new SecureRandom();
@@ -245,7 +243,8 @@ public class Library implements Serializable{
 			// Signature of all data, E(H(domain)), E(H(username)) & IV
 			byte[] signature = ck.signature(domainEncryp, usernameEncryp, iv);
 
-			// Data sending ==> [ CKpub, E(H(domain)), E(H(username)), IV, signature, nounce ]
+			// Data sending ==> [ CKpub, E(H(domain)), E(H(username)), IV,
+			// signature, nounce ]
 			data = server.get(ck.getPublicK(), domainEncryp, usernameEncryp, iv, signature, nounceEncryp);
 			// Data received ==> [ password, iv, signature, nounce ]
 
@@ -265,11 +264,12 @@ public class Library implements Serializable{
 			nounceEncryp = data.get(3);
 			byte[] nounceDeciphered = null;
 
-			// Decipher password with Session Key 
-			
-			//COM CBC
-			//Cipher firstDecipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-			//firstDecipher.init(Cipher.DECRYPT_MODE, sessionKey, ivspec);
+			// Decipher password with Session Key
+
+			// COM CBC
+			// Cipher firstDecipher =
+			// Cipher.getInstance("AES/CBC/PKCS5Padding");
+			// firstDecipher.init(Cipher.DECRYPT_MODE, sessionKey, ivspec);
 
 			// COM ECB
 			Cipher firstDecipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
@@ -277,7 +277,7 @@ public class Library implements Serializable{
 
 			password_aux = firstDecipher.doFinal(passwordCipher);
 			nounceDeciphered = firstDecipher.doFinal(nounceEncryp);
-			
+
 			// Decipher Password with Private Key
 			Cipher decipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
 			decipher.init(Cipher.DECRYPT_MODE, ck.getPrivateK());

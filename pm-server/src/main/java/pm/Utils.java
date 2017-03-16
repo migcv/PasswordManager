@@ -1,8 +1,6 @@
 package pm;
 
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.ObjectOutputStream;
+import java.io.Serializable;
 import java.security.InvalidKeyException;
 import java.security.Key;
 import java.security.MessageDigest;
@@ -15,7 +13,9 @@ import java.security.SignatureException;
 import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
 
-public class Utils {
+public class Utils implements Serializable {
+
+	private static final long serialVersionUID = 1L;
 
 	// Generate a session key
 	public SecretKey createSessionKey() {
@@ -81,20 +81,6 @@ public class Utils {
 			currentIndex += arrays[i].length;
 		}
 		return result;
-	}
-
-	// Saves the state of the server in file pmserver.ser
-	public void saveState() {
-		try {
-			FileOutputStream fileOut = new FileOutputStream("pmserver.ser");
-			ObjectOutputStream out = new ObjectOutputStream(fileOut);
-			out.writeObject(this);
-			out.close();
-			fileOut.close();
-			System.out.println("Serialized data is saved in pmserver.ser");
-		} catch (IOException i) {
-			i.printStackTrace();
-		}
 	}
 
 }

@@ -1,5 +1,8 @@
 package pm;
 
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.math.BigInteger;
 import java.rmi.*;
@@ -251,7 +254,7 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 		// Put back the list of triplet in the map
 		publicKeyMap.put(publicKey, tripletList);
 
-		// saveState();
+		saveState();
 	}
 
 	public ArrayList<byte[]> get(Key publicKey, byte[] domain, byte[] username, byte[] iv, byte[] signature, byte[] n)
@@ -378,5 +381,19 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 		byte[] signature = rsaForSign.sign();
 		return signature;
 	}
+	
+	// Saves the state of the server in file pmserver.ser
+		public void saveState() {
+			try {
+				FileOutputStream fileOut = new FileOutputStream("pmserver.ser");
+				ObjectOutputStream out = new ObjectOutputStream(fileOut);
+				out.writeObject(this);
+				out.close();
+				fileOut.close();
+				System.out.println("Serialized data is saved in pmserver.ser");
+			} catch (IOException i) {
+				i.printStackTrace();
+			}
+		}
 
 }
