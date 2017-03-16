@@ -4,6 +4,7 @@ import static org.junit.Assert.*;
 
 import java.io.UnsupportedEncodingException;
 import java.rmi.Naming;
+import java.security.KeyStore;
 
 import org.junit.After;
 import org.junit.AfterClass;
@@ -38,19 +39,6 @@ public class PMTest {
 
 	}
 
-	@AfterClass
-	public static void oneTimeTearDown() {
-
-	}
-
-	@Before
-	public void setUp() {
-	}
-
-	@After
-	public void tearDown() {
-	}
-
 	@Test
 	public void sucess() throws UnsupportedEncodingException {
 
@@ -67,7 +55,8 @@ public class PMTest {
 	public void sucessWithKeyStore() throws UnsupportedEncodingException {
 
 		Library c = new Library();
-		c.init("password".toCharArray(), "alias", null);
+		KeyStore ks = c.getInstanceOfKeyStore("password".toCharArray(), "monkey");
+		c.init("password".toCharArray(), "monkey", ks);
 		c.register_user();
 		c.save_password("www.google.com".getBytes(), "Miguel".getBytes(), "Viegas".getBytes());
 		String password = new String(c.retrieve_password("www.google.com".getBytes(), "Miguel".getBytes()), "UTF-8");
