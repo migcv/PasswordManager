@@ -1,10 +1,13 @@
 package pm;
 
 import java.security.*;
+import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.IOException;
 
 public class KeyManagement {
 
@@ -25,15 +28,8 @@ public class KeyManagement {
 
 	}
 
-	public void getKeys(KeyStore ks, String alias, char[] password) throws Exception {
+	public void getKeys(KeyStore ks, char[] password, String alias) throws Exception {
 
-		// Open the KeyStore file
-		FileInputStream fis = new FileInputStream("keystorefile.jce");
-		// Create an instance of KeyStore of type “JCEKS”
-		ks = KeyStore.getInstance("JCEKS");
-		// Load the key entries from the file into the KeyStore object.
-		ks.load(fis, password);
-		fis.close();
 		// Get the key with the given alias.
 		// Key k = ks.getKey(alias, password);
 		publicK = ks.getCertificate(alias).getPublicKey();

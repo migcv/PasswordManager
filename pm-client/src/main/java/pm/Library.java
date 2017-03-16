@@ -1,10 +1,14 @@
 package pm;
 
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.io.Serializable;
 import java.math.BigInteger;
 import java.rmi.Naming;
 import java.rmi.RemoteException;
 import java.security.*;
+import java.security.cert.CertificateException;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.ArrayList;
@@ -28,8 +32,9 @@ public class Library implements Serializable {
 	private SecretKey sessionKey = null;
 
 	private BigInteger nounce = null;
+	
 
-	public void init(char[] password, String alias, KeyStore... ks) {
+	public void init(char[] password, String alias, KeyStore ks) {
 
 		ck = new KeyManagement();
 
@@ -37,7 +42,7 @@ public class Library implements Serializable {
 		connectToServer();
 
 		// Generate a new key pair
-		if (ks.length == 0) {
+		if (ks == null) {
 			try {
 				ck.generateKeyPair(password, alias);
 				System.out.println("init: generating new key pair!");
@@ -48,7 +53,7 @@ public class Library implements Serializable {
 		// Extracts the key pair
 		else {
 			try {
-				ck.getKeys(ks[0], alias, password);
+				ck.getKeys(ks, password, alias);
 				System.out.println("init: extracting key pair!");
 			} catch (Exception e) {
 				e.printStackTrace();
@@ -332,6 +337,30 @@ public class Library implements Serializable {
 		} catch (Exception e) {
 			System.out.println("Ups...something is wrong: " + e.getMessage());
 		}
+	}
+
+	public KeyStore getInstanceOfKeyStore(char[] password, String alias) {
+		// Create an instance of KeyStore of type “JCEKS”
+		KeyStore ks = null;
+		try {
+			// Open the KeyStore file
+			FileInputStream fis = new FileInputStream("keystorefile" + alias + ".jce");
+			ks = KeyStore.getInstance("JCEKS");
+			// Load the key entries from the file into the KeyStore object.
+			ks.load(fis, password);
+			fis.close();
+		} catch (FileNotFoundException e) {
+			return null;
+		} catch (KeyStoreException e) {
+			return null;
+		} catch (NoSuchAlgorithmException e) {
+			return null;
+		} catch (CertificateException e) {
+			return null;
+		} catch (IOException e) {
+			return null;
+		}
+		return ks;
 	}
 
 }

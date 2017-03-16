@@ -1,12 +1,16 @@
 package pm;
 
+import java.security.KeyStore;
+
 public class Client {
 
 	public static void main(String[] args) throws Exception {
 
 		Library c = new Library();
 		
-		c.init("password".toCharArray(), "alias");
+		KeyStore ks = c.getInstanceOfKeyStore("password".toCharArray(), "alias");
+		
+		c.init("password".toCharArray(), "alias", ks);
 		
 		c.register_user();
 		
