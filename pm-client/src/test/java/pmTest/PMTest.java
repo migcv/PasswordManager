@@ -77,7 +77,7 @@ public class PMTest {
 	}
 
 	@Test
-	public void sucessTwoUsers(){
+	public void sucessTwoLibrarys(){
 
 		Library c = new Library();
 		c.init("password".toCharArray(), "alias");
