@@ -58,7 +58,7 @@ public class Library implements Serializable{
 
 		try {
 			// data ==> [ Server_Public_Key, Session_Key, Signature ]
-			ArrayList<byte[]> data = server.init(ck.getPublicK());
+			ArrayList<byte[]> data = server.init(ck.getPublicK(), ck.signature(ck.getPublicK().getEncoded()));
 
 			// Server's public key
 			serverKey = KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(data.get(0)));

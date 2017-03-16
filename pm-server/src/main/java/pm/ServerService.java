@@ -6,7 +6,7 @@ import java.util.ArrayList;
 
 public interface ServerService extends Remote {
 
-	public ArrayList<byte[]> init(Key publicKey) throws RemoteException;
+	public ArrayList<byte[]> init(Key publicKey, byte[] signature) throws RemoteException;
 
 	public void register(Key publicKey, byte[] n, byte[] iv) throws RemoteException;
 

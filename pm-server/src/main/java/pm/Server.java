@@ -64,7 +64,7 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 		}
 	}
 
-	public ArrayList<byte[]> init(Key publicKey) throws RemoteException {
+	public ArrayList<byte[]> init(Key publicKey, byte[] sig) throws RemoteException {
 		SecretKey sessionKey = utl.createSessionKey();
 		sessionKeyMap.put(publicKey, sessionKey);
 		Cipher cipher;
