@@ -61,7 +61,7 @@ public class Library implements Serializable {
 		}
 
 		try {
-			// data ==> [ Server_Public_Key, Session_Key, Nonce, IV, Signature ]
+			// data received ==> [ Server_Public_Key, Session_Key, Nonce, IV, Signature ]
 			ArrayList<byte[]> data = server.init(ck.getPublicK(), ck.signature(ck.getPublicK().getEncoded()));
 
 			// Server's public key
@@ -95,7 +95,8 @@ public class Library implements Serializable {
 			Cipher simetricCipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
 			simetricCipher.init(Cipher.DECRYPT_MODE, sessionKey, ivspec);
 			byte[] nounceDeciphered = simetricCipher.doFinal(nounceCiphered);
-
+			
+			// Store given nonce
 			nounce = new BigInteger(nounceDeciphered);
 
 		} catch (RemoteException e) {
@@ -122,6 +123,7 @@ public class Library implements Serializable {
 	public void register_user() {
 
 		try {
+			// Generate new IV
 			SecureRandom random = new SecureRandom();
 			byte[] iv = new byte[16];
 			random.nextBytes(iv);
@@ -136,6 +138,7 @@ public class Library implements Serializable {
 
 			byte[] nounceCiphered = simetricCipher.doFinal(nounce.toByteArray());
 
+			// Signature of all data [ CKpub, E(nonce) & IV ]
 			byte[] signature = ck.signature(ck.getPublicK().getEncoded(), nounceCiphered, iv);
 
 			server.register(ck.getPublicK(), nounceCiphered, iv, signature);
