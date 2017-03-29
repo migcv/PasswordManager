@@ -7,31 +7,33 @@ import java.rmi.registry.*;
 
 public class ServerMain {
 
-	public static void main(String[] args){
-		
+	protected static int N = 10;
+
+	public static void main(String[] args) {
+
 		int registryPort = 10000;
 		System.setSecurityManager(new SecurityManager());
 		ServerService server = null;
-		
+
 		// Load the state of the server
 		server = loadState();
-		
-		try {
-			// If the load returned null, create new Server instance
-			if(server == null) {
-				server = new Server();
+		for (int i = 0; i < N; i++) {
+			try {
+				// If the load returned null, create new Server instance
+				if (server == null) {
+					server = new Server();
+				}
+				// Registry Server
+				Registry reg = LocateRegistry.createRegistry(registryPort + i);
+				reg.rebind("ServerService", server);
+				System.out.println("Password Manager Server ready!" + registryPort + i);
+			} catch (Exception e) {
+				System.out.println("Ups...something is wrong: " + e.getMessage());
+				e.printStackTrace();
 			}
-			// Registry Server
-			Registry reg = LocateRegistry.createRegistry(registryPort);
-			reg.rebind("ServerService", server);
-			System.out.println("Password Manager Server ready!");
-		} catch (Exception e) {
-			System.out.println("Ups...something is wrong: " + e.getMessage());
-			e.printStackTrace();
 		}
-		
 	}
-	
+
 	// Load the state of the server from file pmserver.ser
 	private static ServerService loadState() {
 		try {
