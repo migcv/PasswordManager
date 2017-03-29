@@ -30,6 +30,8 @@ public class Library implements Serializable {
 
 	private PublicKey serverKey = null;
 	private SecretKey sessionKey = null;
+	
+	private BigInteger userID = null;
 
 	private BigInteger nounce = null;
 	
@@ -61,23 +63,23 @@ public class Library implements Serializable {
 		}
 
 		try {
-			// data received ==> [ Server_Public_Key, Session_Key, Nonce, IV, Signature ]
+			// data sent ==> [ Client_Public_Key, Signature ]
 			ArrayList<byte[]> data = server.init(ck.getPublicK(), ck.signature(ck.getPublicK().getEncoded()));
+			// data received ==> [ Server_Public_Key, Session_Key, userID, Nonce, IV, Signature ]
 
 			// Server's public key
 			serverKey = KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(data.get(0)));
 
-			// Verifies Signature verifySignature(SK_pub, signature, SK_pub, Ks,
-			// Nonce, IV)
-			if (!ck.verifySignature(serverKey, data.get(4), data.get(0), data.get(1), data.get(2), data.get(3))) {
+			// Verifies Signature verifySignature(SK_pub, signature, SK_pub, Ks, userID, Nonce, IV)
+			if (!ck.verifySignature(serverKey, data.get(5), data.get(0), data.get(1), data.get(2), data.get(3), data.get(4))) {
 				System.out.println("init: signature wrong!");
 				return;
 			}
 
-			// Session key ciphered
+			// Session Key ciphered
 			byte[] sessionKeyCiphered = data.get(1);
 
-			// Deciphering of the session key
+			// Deciphering of the session_key w/ server_public_key
 			Cipher decipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
 			decipher.init(Cipher.DECRYPT_MODE, ck.getPrivateK());
 			byte[] aux = decipher.doFinal(sessionKeyCiphered);
@@ -85,16 +87,23 @@ public class Library implements Serializable {
 			sessionKey = new SecretKeySpec(aux, 0, aux.length, "AES");
 
 			// IV
-			byte[] iv = data.get(3);
+			byte[] iv = data.get(4);
 			IvParameterSpec ivspec = new IvParameterSpec(iv);
 
-			// Nounce
-			byte[] nounceCiphered = data.get(2);
+			// UserID ciphered
+			byte[] userIDCiphered = data.get(2);
+			
+			// Nounce ciphered
+			byte[] nounceCiphered = data.get(3);
 
-			// Deciphering of the nounce
+			// Deciphering of the userID and nounce w/ session_key
 			Cipher simetricCipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
 			simetricCipher.init(Cipher.DECRYPT_MODE, sessionKey, ivspec);
+			byte[] userIDDeciphered = simetricCipher.doFinal(userIDCiphered);
 			byte[] nounceDeciphered = simetricCipher.doFinal(nounceCiphered);
+			
+			// Store UserID
+			userID = new BigInteger(userIDDeciphered);
 			
 			// Store given nonce
 			nounce = new BigInteger(nounceDeciphered);
@@ -131,17 +140,24 @@ public class Library implements Serializable {
 
 			// Increment nounce
 			nounce = nounce.shiftLeft(2);
+			
+			// Cipher userID w/ server_pub_key
+			Cipher assimetricCipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+			assimetricCipher.init(Cipher.ENCRYPT_MODE, serverKey);
 
-			// Cipher nounce
+			byte[] userIDCiphered = assimetricCipher.doFinal(userID.toByteArray());
+
+			// Cipher nounce w/ session_key
 			Cipher simetricCipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
 			simetricCipher.init(Cipher.ENCRYPT_MODE, sessionKey, ivspec);
-
+			
 			byte[] nounceCiphered = simetricCipher.doFinal(nounce.toByteArray());
 
-			// Signature of all data [ CKpub, E(nonce) & IV ]
-			byte[] signature = ck.signature(ck.getPublicK().getEncoded(), nounceCiphered, iv);
+			// Signature of all data [ CKpub, E(userID), E(nonce) & IV ]
+			byte[] signature = ck.signature(ck.getPublicK().getEncoded(), userIDCiphered, nounceCiphered, iv);
 
-			server.register(ck.getPublicK(), nounceCiphered, iv, signature);
+			// data sent ==> [ Client_Public_Key, User_ID, Nounce, IV, Signature ]
+			server.register(ck.getPublicK(), userIDCiphered, nounceCiphered, iv, signature);
 			System.out.println("register: user registered!");
 
 		} catch (RemoteException e) {
@@ -166,15 +182,21 @@ public class Library implements Serializable {
 
 	public void save_password(byte[] domain, byte[] username, byte[] password) {
 
-		byte[] passEncryp = null, domainEncry = null, usernameEncry = null, nounceCiphered = null;
+		byte[] userIDCiphered = null, passCiphered = null, domainCiphered = null, usernameCiphered = null, nounceCiphered = null;
 
 		nounce = nounce.shiftLeft(2);
 
 		try {
-			// Cipher Password with Public Key
-			Cipher cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
-			cipher.init(Cipher.ENCRYPT_MODE, ck.getPublicK());
-			passEncryp = cipher.doFinal(password);
+			// Cipher UserID & Password with Public Key
+			Cipher assimetricCipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+			assimetricCipher.init(Cipher.ENCRYPT_MODE, serverKey);
+			
+			userIDCiphered = assimetricCipher.doFinal(userID.toByteArray());
+			
+			assimetricCipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+			assimetricCipher.init(Cipher.ENCRYPT_MODE, ck.getPublicK());
+			
+			passCiphered = assimetricCipher.doFinal(password);
 
 			// Generate a random IV
 			SecureRandom random = new SecureRandom();
@@ -190,17 +212,17 @@ public class Library implements Serializable {
 			Cipher simetricCipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
 			simetricCipher.init(Cipher.ENCRYPT_MODE, sessionKey, ivspec);
 
-			passEncryp = simetricCipher.doFinal(passEncryp);
-			domainEncry = simetricCipher.doFinal(domainHash);
-			usernameEncry = simetricCipher.doFinal(usernameHash);
+			passCiphered = simetricCipher.doFinal(passCiphered);
+			domainCiphered = simetricCipher.doFinal(domainHash);
+			usernameCiphered = simetricCipher.doFinal(usernameHash);
 			nounceCiphered = simetricCipher.doFinal(nounce.toByteArray());
 
 			// Signature of all data [ E(H(domain)), E(H(username)),
 			// E(E(password)) & IV ]
-			byte[] signature = ck.signature(domainEncry, usernameEncry, passEncryp, iv);
+			byte[] signature = ck.signature(userIDCiphered, domainCiphered, usernameCiphered, passCiphered, iv);
 
-			// Data sending ==> [ CKpub, E(H(domain)), E(H(username)), E(E(password)), IV, signature ]
-			server.put(ck.getPublicK(), domainEncry, usernameEncry, passEncryp, iv, nounceCiphered, signature);
+			// Data sending ==> [ CKpub, User_ID, E(H(domain)), E(H(username)), E(E(password)), IV, signature ]
+			server.put(ck.getPublicK(), userIDCiphered, domainCiphered, usernameCiphered, passCiphered, iv, nounceCiphered, signature);
 
 		} catch (RemoteException e) {
 			e.printStackTrace();
@@ -223,12 +245,18 @@ public class Library implements Serializable {
 
 	public byte[] retrieve_password(byte[] domain, byte[] username) {
 
-		byte[] password = null, password_aux = null, domainEncryp = null, usernameEncryp = null, nounceEncryp = null;
+		byte[] password = null, password_aux = null, userIDCiphered = null, domainEncryp = null, usernameEncryp = null, nounceEncryp = null;
 		ArrayList<byte[]> data = new ArrayList<byte[]>();
 
 		nounce = nounce.shiftLeft(2);
 
 		try {
+			// Cipher UserID & Password with Public Key
+			Cipher assimetricCipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+			assimetricCipher.init(Cipher.ENCRYPT_MODE, serverKey);
+			
+			userIDCiphered = assimetricCipher.doFinal(userID.toByteArray());
+			
 			// Generate a random IV
 			SecureRandom random = new SecureRandom();
 			byte[] iv = new byte[16];
@@ -240,18 +268,18 @@ public class Library implements Serializable {
 			byte[] usernameHash = ck.digest(username);
 
 			// Cipher domain & username with session key
-			Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-			cipher.init(Cipher.ENCRYPT_MODE, sessionKey, ivspec);
+			Cipher simetricCipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+			simetricCipher.init(Cipher.ENCRYPT_MODE, sessionKey, ivspec);
 
-			domainEncryp = cipher.doFinal(domainHash);
-			usernameEncryp = cipher.doFinal(usernameHash);
-			nounceEncryp = cipher.doFinal(nounce.toByteArray());
+			domainEncryp = simetricCipher.doFinal(domainHash);
+			usernameEncryp = simetricCipher.doFinal(usernameHash);
+			nounceEncryp = simetricCipher.doFinal(nounce.toByteArray());
 
 			// Signature of all data Public_Key, E(H(domain)), E(H(username)), E(Nonce) & IV
-			byte[] signature = ck.signature(ck.getPublicK().getEncoded(), domainEncryp, usernameEncryp, nounceEncryp, iv);
+			byte[] signature = ck.signature(ck.getPublicK().getEncoded(), userIDCiphered, domainEncryp, usernameEncryp, nounceEncryp, iv);
 
 			// Data sending ==> [ CKpub, E(H(domain)), E(H(username)), IV, nounce, signature ]
-			data = server.get(ck.getPublicK(), domainEncryp, usernameEncryp, iv, nounceEncryp, signature);
+			data = server.get(ck.getPublicK(), userIDCiphered, domainEncryp, usernameEncryp, iv, nounceEncryp, signature);
 			// Data received ==> [ password, nounce, iv, signature ]
 
 			// Verifies Signature - verifySignature(public_key, signature, password, nonce, iv)
@@ -277,25 +305,26 @@ public class Library implements Serializable {
 			// firstDecipher.init(Cipher.DECRYPT_MODE, sessionKey, ivspec);
 
 			// COM ECB
-			Cipher firstDecipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
-			firstDecipher.init(Cipher.DECRYPT_MODE, sessionKey);
+			Cipher simetricDecipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
+			simetricDecipher.init(Cipher.DECRYPT_MODE, sessionKey);
 
-			password_aux = firstDecipher.doFinal(passwordCipher);
-			nounceDeciphered = firstDecipher.doFinal(nounceEncryp);
+			password_aux = simetricDecipher.doFinal(passwordCipher);
+			nounceDeciphered = simetricDecipher.doFinal(nounceEncryp);
 
 			// Decipher Password with Private Key
-			Cipher decipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
-			decipher.init(Cipher.DECRYPT_MODE, ck.getPrivateK());
-			password = decipher.doFinal(password_aux);
+			Cipher assimetricDecipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+			assimetricDecipher.init(Cipher.DECRYPT_MODE, ck.getPrivateK());
+			password = assimetricDecipher.doFinal(password_aux);
 
 			// Verify nounce
 			BigInteger bg = new BigInteger(nounceDeciphered);
 
-			nounce = nounce.shiftLeft(2);
-
-			if (!bg.equals(nounce)) {
+			// Check nonce
+			if (!bg.equals(nounce.shiftLeft(2))) {
 				throw new InvalidNounceException();
 			}
+			
+			nounce = nounce.shiftLeft(2);
 
 		} catch (RemoteException e) {
 			e.printStackTrace();

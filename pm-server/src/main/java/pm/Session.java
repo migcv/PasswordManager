@@ -1,11 +1,12 @@
 package pm;
 
+import java.io.Serializable;
 import java.math.BigInteger;
 import java.security.Key;
 
 import javax.crypto.SecretKey;
 
-public class Session {
+public class Session implements Serializable {
 
 	private Key pubKey;
 	private SecretKey sessionKey;

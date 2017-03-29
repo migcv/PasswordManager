@@ -2,7 +2,7 @@ package pm;
 
 import java.io.Serializable;
 
-public class Triplet  implements Serializable{
+public class Triplet implements Serializable {
 
 	private static final long serialVersionUID = 1L;
 	

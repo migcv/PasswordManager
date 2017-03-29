@@ -144,8 +144,10 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 			Cipher decipherID = Cipher.getInstance("RSA/ECB/PKCS1Padding");
 			decipherID.init(Cipher.DECRYPT_MODE, this.privateKey);
 			idDecipher = decipherID.doFinal(id);
+			
+			BigInteger userID = new BigInteger(idDecipher);
 
-			Session ss = sessionKeyMap.get(idDecipher);
+			Session ss = sessionKeyMap.get(userID);
 
 			// Decipher Nounce with Session key
 			Cipher decipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
@@ -197,7 +199,9 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 			decipherID.init(Cipher.DECRYPT_MODE, this.privateKey);
 			idDeciphered = decipherID.doFinal(id);
 
-			Session ss = sessionKeyMap.get(idDeciphered);
+			BigInteger userID = new BigInteger(idDeciphered);
+
+			Session ss = sessionKeyMap.get(userID);
 
 			// Decipher Nounce with Session key
 			IvParameterSpec ivspec = new IvParameterSpec(iv);
@@ -296,7 +300,9 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 			decipherID.init(Cipher.DECRYPT_MODE, this.privateKey);
 			idDeciphered = decipherID.doFinal(id);
 
-			Session ss = sessionKeyMap.get(idDeciphered);
+			BigInteger userID = new BigInteger(idDeciphered);
+
+			Session ss = sessionKeyMap.get(userID);
 
 			// Decipher Nounce with Session key
 			IvParameterSpec ivspec = new IvParameterSpec(iv);
@@ -313,7 +319,7 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 				throw new InvalidNounceException();
 			}
 
-			ss.setNounce(bg);
+			ss.setNounce(bg.shiftLeft(2));
 
 			byte[] passwordCiphered = null;
 			byte[] nounceCiphered = null;

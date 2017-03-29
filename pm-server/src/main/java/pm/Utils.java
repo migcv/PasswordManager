@@ -68,7 +68,7 @@ public class Utils implements Serializable {
 
 	public BigInteger generateBigInteger() {
 		Random rand = new SecureRandom();
-		return new BigInteger(30000, rand);
+		return new BigInteger(1900, rand);
 	}
 
 	// Auxiliary function for verifySignature, to join all data received from
