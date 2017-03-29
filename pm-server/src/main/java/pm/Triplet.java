@@ -12,7 +12,8 @@ public class Triplet  implements Serializable{
 	
 	private byte[] salt;
 
-	public Triplet(byte[] domain, byte[] username, byte[] password, byte[] salt) {
+	public Triplet(byte[] domain, byte[] username, byte[] password, byte[] salt) { 
+		// guardar a assinatura de tudo para garantir nao repudio toto
 		this.setDomain(domain);
 		this.setUsername(username);
 		this.setPassword(password);

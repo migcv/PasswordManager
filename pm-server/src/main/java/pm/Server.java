@@ -43,7 +43,7 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 	private PrivateKey privateKey;
 	private BigInteger nounce = null;
 
-	private Map<Key, ArrayList<Triplet>> publicKeyMap = new HashMap<Key, ArrayList<Triplet>>();
+	private Map<Key, ArrayList<Triplet>> publicKeyMap = new HashMap<Key, ArrayList<Triplet>>(); 
 
 	private Map<Key, SecretKey> sessionKeyMap = new HashMap<Key, SecretKey>();
 
@@ -68,12 +68,12 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 	}
 
 	public ArrayList<byte[]> init(Key publicKey, byte[] sig) throws RemoteException {
-		
+
 		// Verify Signature
 		if (!utl.verifySignature(publicKey, sig, publicKey.getEncoded())) {
 			throw new SignatureWrongException();
 		}
-		
+
 		SecretKey sessionKey = utl.createSessionKey();
 		sessionKeyMap.put(publicKey, sessionKey);
 		Cipher cipher;
@@ -97,8 +97,9 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 			cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
 			cipher.init(Cipher.ENCRYPT_MODE, sessionKeyMap.get(publicKey), ivspec);
 			nounceCiphered = cipher.doFinal(nounce.toByteArray());
-			
-			// Signature contaning [ Public Key, Session Key, Nonce, IV ] signed with Server's private
+
+			// Signature contaning [ Public Key, Session Key, Nonce, IV ] signed
+			// with Server's private
 			// key
 			signature = sign(this.publicKey.getEncoded(), sessionKeyCiphered, nounceCiphered, iv);
 
@@ -128,12 +129,12 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 	}
 
 	public void register(Key publicKey, byte[] nonce, byte[] iv, byte[] signature) throws RemoteException {
-		
+
 		// Verify Signature
 		if (!utl.verifySignature(publicKey, signature, publicKey.getEncoded(), nonce, iv)) {
 			throw new SignatureWrongException();
 		}
-		
+
 		IvParameterSpec ivspec = new IvParameterSpec(iv);
 
 		byte[] nounceDecipher;
@@ -168,7 +169,8 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 
 	}
 
-	public void put(Key publicKey, byte[] domain, byte[] username, byte[] password, byte[] iv, byte[] n, byte[] signature) throws RemoteException, PublicKeyDoesntExistException, SignatureWrongException {
+	public void put(Key publicKey, byte[] domain, byte[] username, byte[] password, byte[] iv, byte[] n,
+			byte[] signature) throws RemoteException, PublicKeyDoesntExistException, SignatureWrongException {
 
 		// Verify Signature
 		if (!utl.verifySignature(publicKey, signature, domain, username, password, iv)) {
@@ -256,7 +258,7 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 		saveState();
 	}
 
-	public ArrayList<byte[]> get(Key publicKey, byte[] domain, byte[] username, byte[] iv,  byte[] n, byte[] signature)
+	public ArrayList<byte[]> get(Key publicKey, byte[] domain, byte[] username, byte[] iv, byte[] n, byte[] signature)
 			throws RemoteException, PublicKeyDoesntExistException, DomainOrUsernameDoesntExistException,
 			SignatureWrongException {
 		// Verify Signature
@@ -276,30 +278,31 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 			nounceDeciphered = cipher.doFinal(n);
 
 			BigInteger bg = new BigInteger(nounceDeciphered);
-	
+
 			nounce = nounce.shiftLeft(2);
-	
+
 			if (!bg.equals(nounce)) {
 				throw new InvalidNounceException();
 			}
-	
+
 			nounce = nounce.shiftLeft(2);
-	
+
 			byte[] passwordCiphered = null;
 			byte[] nounceCiphered = null;
 			ArrayList<Triplet> tripletList = publicKeyMap.get(publicKey);
-	
+
 			// Verifies if the publicKey exists
 			if (tripletList == null) {
 				throw new PublicKeyDoesntExistException();
 			}
-	
+
 			for (int i = 0; i < tripletList.size(); i++) {
-				// Verifies if the domain & username exists, if true, sends password
+				// Verifies if the domain & username exists, if true, sends
+				// password
 				if (Arrays.equals(tripletList.get(i).getDomain(),
-					utl.diggestSalt(domainDeciphered, tripletList.get(i).getSalt()))
-					&& Arrays.equals(tripletList.get(i).getUsername(),
-							utl.diggestSalt(usernameDeciphered, tripletList.get(i).getSalt()))) {
+						utl.diggestSalt(domainDeciphered, tripletList.get(i).getSalt()))
+						&& Arrays.equals(tripletList.get(i).getUsername(),
+								utl.diggestSalt(usernameDeciphered, tripletList.get(i).getSalt()))) {
 
 					// Generate a random IV
 					SecureRandom random = new SecureRandom();
@@ -308,25 +311,29 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 					ivspec = new IvParameterSpec(res_iv);
 
 					// Cipher password with session key
-					
+
 					// COM CBC
-					//Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-					//cipher.init(Cipher.ENCRYPT_MODE, sessionKeyMap.get(publicKey), ivspec);
+					// Cipher cipher =
+					// Cipher.getInstance("AES/CBC/PKCS5Padding");
+					// cipher.init(Cipher.ENCRYPT_MODE,
+					// sessionKeyMap.get(publicKey), ivspec);
 
 					// COM ECB
 					cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
 					cipher.init(Cipher.ENCRYPT_MODE, sessionKeyMap.get(publicKey));
-					
-					
-					//System.out.println(new String(tripletList.get(i).getPassword()));
-					
+
+					// System.out.println(new
+					// String(tripletList.get(i).getPassword()));
+
 					passwordCiphered = cipher.doFinal(tripletList.get(i).getPassword());
 					nounceCiphered = cipher.doFinal(nounce.toByteArray());
 
-					// Signature contaning [ password, nonce, iv ] signed with Server's private key
+					// Signature contaning [ password, nonce, iv ] signed with
+					// Server's private key
 					signatureToSend = sign(passwordCiphered, nounceCiphered, iv);
-	
-					// Create List to send with [ password_ciphered, iv, signature,
+
+					// Create List to send with [ password_ciphered, iv,
+					// signature,
 					// nounce ]
 					ArrayList<byte[]> res = new ArrayList<byte[]>();
 					res.add(passwordCiphered);
@@ -366,7 +373,7 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 		byte[] signature = rsaForSign.sign();
 		return signature;
 	}
-	
+
 	// Saves the state of the server in file pmserver.ser
 	public void saveState() {
 		try {
