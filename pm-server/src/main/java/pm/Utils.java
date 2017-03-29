@@ -1,6 +1,7 @@
 package pm;
 
 import java.io.Serializable;
+import java.math.BigInteger;
 import java.security.InvalidKeyException;
 import java.security.Key;
 import java.security.MessageDigest;
@@ -9,6 +10,7 @@ import java.security.PublicKey;
 import java.security.SecureRandom;
 import java.security.Signature;
 import java.security.SignatureException;
+import java.util.Random;
 
 import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
@@ -62,6 +64,11 @@ public class Utils implements Serializable {
 			e.printStackTrace();
 		}
 		return res;
+	}
+
+	public BigInteger generateBigInteger() {
+		Random rand = new SecureRandom();
+		return new BigInteger(30000, rand);
 	}
 
 	// Auxiliary function for verifySignature, to join all data received from

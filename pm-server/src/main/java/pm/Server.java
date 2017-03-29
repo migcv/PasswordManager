@@ -22,7 +22,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Random;
 
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
@@ -30,10 +29,7 @@ import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.IvParameterSpec;
-import pm.exception.DomainOrUsernameDoesntExistException;
-import pm.exception.InvalidNounceException;
-import pm.exception.PublicKeyDoesntExistException;
-import pm.exception.SignatureWrongException;
+import pm.exception.*;
 
 public class Server extends UnicastRemoteObject implements ServerService, Serializable {
 
@@ -41,11 +37,10 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 
 	private PublicKey publicKey;
 	private PrivateKey privateKey;
-	private BigInteger nounce = null;
 
-	private Map<Key, ArrayList<Triplet>> publicKeyMap = new HashMap<Key, ArrayList<Triplet>>(); 
+	private Map<Key, ArrayList<Triplet>> publicKeyMap = new HashMap<Key, ArrayList<Triplet>>();
 
-	private Map<Key, SecretKey> sessionKeyMap = new HashMap<Key, SecretKey>();
+	private Map<BigInteger, Session> sessionKeyMap = new HashMap<BigInteger, Session>();
 
 	Utils utl = new Utils();
 
@@ -74,13 +69,15 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 			throw new SignatureWrongException();
 		}
 
-		SecretKey sessionKey = utl.createSessionKey();
-		sessionKeyMap.put(publicKey, sessionKey);
-		Cipher cipher;
-		byte[] sessionKeyCiphered = null, signature = null, nounceCiphered = null, iv = null;
+		BigInteger id = utl.generateBigInteger();
+		BigInteger nounce = utl.generateBigInteger();
 
-		Random rand = new SecureRandom();
-		this.nounce = new BigInteger(30000, rand);
+		SecretKey sessionKey = utl.createSessionKey();
+		Session ss = new Session(publicKey, sessionKey, nounce);
+		sessionKeyMap.put(id, ss);
+		Cipher cipher;
+		byte[] sessionKeyCiphered = null, signature = null, nounceCiphered = null, iv = null, idCiphered = null;
+		ArrayList<byte[]> res = new ArrayList<byte[]>();
 
 		try {
 			// Cipher Session Key with Client's public key
@@ -94,14 +91,23 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 			random.nextBytes(iv);
 			IvParameterSpec ivspec = new IvParameterSpec(iv);
 
+			// Cipher the nounce and the id with the Session Key
 			cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-			cipher.init(Cipher.ENCRYPT_MODE, sessionKeyMap.get(publicKey), ivspec);
+			cipher.init(Cipher.ENCRYPT_MODE, ss.getSessionKey(), ivspec);
 			nounceCiphered = cipher.doFinal(nounce.toByteArray());
+			idCiphered = cipher.doFinal(id.toByteArray());
 
-			// Signature contaning [ Public Key, Session Key, Nonce, IV ] signed
-			// with Server's private
-			// key
-			signature = sign(this.publicKey.getEncoded(), sessionKeyCiphered, nounceCiphered, iv);
+			// Signature contaning [ Public Key, Session Key, Nonce, id, IV ]
+			// signed with Server's private key
+			signature = sign(this.publicKey.getEncoded(), sessionKeyCiphered, idCiphered, nounceCiphered, iv);
+
+			// Create the array to send to the client
+			res.add(this.publicKey.getEncoded());
+			res.add(sessionKeyCiphered);
+			res.add(idCiphered);
+			res.add(nounceCiphered);
+			res.add(iv);
+			res.add(signature);
 
 		} catch (NoSuchAlgorithmException e) {
 			e.printStackTrace();
@@ -116,40 +122,43 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 		} catch (SignatureException e) {
 			e.printStackTrace();
 		} catch (InvalidAlgorithmParameterException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-		ArrayList<byte[]> res = new ArrayList<byte[]>();
-		res.add(this.publicKey.getEncoded());
-		res.add(sessionKeyCiphered);
-		res.add(nounceCiphered);
-		res.add(iv);
-		res.add(signature);
+
 		return res;
 	}
 
-	public void register(Key publicKey, byte[] nonce, byte[] iv, byte[] signature) throws RemoteException {
+	public void register(Key publicKey, byte[] id, byte[] nonce, byte[] iv, byte[] signature) throws RemoteException {
 
 		// Verify Signature
-		if (!utl.verifySignature(publicKey, signature, publicKey.getEncoded(), nonce, iv)) {
+		if (!utl.verifySignature(publicKey, signature, publicKey.getEncoded(), id, nonce, iv)) {
 			throw new SignatureWrongException();
 		}
 
 		IvParameterSpec ivspec = new IvParameterSpec(iv);
 
-		byte[] nounceDecipher;
+		byte[] nounceDecipher = null, idDecipher = null;
 		try {
+
+			// Decipher ID with Server's private key
+			Cipher decipherID = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+			decipherID.init(Cipher.DECRYPT_MODE, this.privateKey);
+			idDecipher = decipherID.doFinal(id);
+
+			Session ss = sessionKeyMap.get(idDecipher);
+
+			// Decipher Nounce with Session key
 			Cipher decipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-			decipher.init(Cipher.DECRYPT_MODE, sessionKeyMap.get(publicKey), ivspec);
+			decipher.init(Cipher.DECRYPT_MODE, ss.getSessionKey(), ivspec);
 			nounceDecipher = decipher.doFinal(nonce);
 
 			BigInteger bg = new BigInteger(nounceDecipher);
 
-			nounce = nounce.shiftLeft(2);
-
-			if (!bg.equals(nounce)) {
+			if (!bg.equals(ss.getNounce().shiftLeft(2))) {
 				throw new InvalidNounceException();
 			}
+
+			ss.setNounce(bg);
 
 			publicKeyMap.put(publicKey, new ArrayList<Triplet>());
 
@@ -169,25 +178,44 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 
 	}
 
-	public void put(Key publicKey, byte[] domain, byte[] username, byte[] password, byte[] iv, byte[] n,
+	public void put(Key publicKey, byte[] id, byte[] domain, byte[] username, byte[] password, byte[] iv, byte[] n,
 			byte[] signature) throws RemoteException, PublicKeyDoesntExistException, SignatureWrongException {
 
 		// Verify Signature
-		if (!utl.verifySignature(publicKey, signature, domain, username, password, iv)) {
+		if (!utl.verifySignature(publicKey, signature, id, domain, username, password, iv)) {
 			throw new SignatureWrongException();
 		}
 
-		byte[] domainDeciphered = null, usernameDeciphered = null, passwordDeciphered = null, nounceDeciphered = null;
+		byte[] domainDeciphered = null, usernameDeciphered = null, passwordDeciphered = null, nounceDeciphered = null,
+				idDeciphered = null;
 
 		// Decipher content
 		try {
+
+			// Decipher ID with Server's private key
+			Cipher decipherID = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+			decipherID.init(Cipher.DECRYPT_MODE, this.privateKey);
+			idDeciphered = decipherID.doFinal(id);
+
+			Session ss = sessionKeyMap.get(idDeciphered);
+
+			// Decipher Nounce with Session key
 			IvParameterSpec ivspec = new IvParameterSpec(iv);
-			Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-			cipher.init(Cipher.DECRYPT_MODE, sessionKeyMap.get(publicKey), ivspec);
-			domainDeciphered = cipher.doFinal(domain);
-			usernameDeciphered = cipher.doFinal(username);
-			passwordDeciphered = cipher.doFinal(password);
-			nounceDeciphered = cipher.doFinal(n);
+			Cipher decipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+			decipher.init(Cipher.DECRYPT_MODE, ss.getSessionKey(), ivspec);
+			domainDeciphered = decipher.doFinal(domain);
+			usernameDeciphered = decipher.doFinal(username);
+			passwordDeciphered = decipher.doFinal(password);
+			nounceDeciphered = decipher.doFinal(n);
+
+			BigInteger bg = new BigInteger(nounceDeciphered);
+
+			if (!bg.equals(ss.getNounce().shiftLeft(2))) {
+				throw new InvalidNounceException();
+			}
+
+			ss.setNounce(bg);
+
 		} catch (IllegalBlockSizeException e) {
 			e.printStackTrace();
 		} catch (BadPaddingException e) {
@@ -200,14 +228,6 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 			e.printStackTrace();
 		} catch (NoSuchPaddingException e) {
 			e.printStackTrace();
-		}
-
-		BigInteger bg = new BigInteger(nounceDeciphered);
-
-		nounce = nounce.shiftLeft(2);
-
-		if (!bg.equals(nounce)) {
-			throw new InvalidNounceException();
 		}
 
 		boolean exists = false;
@@ -258,34 +278,42 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 		saveState();
 	}
 
-	public ArrayList<byte[]> get(Key publicKey, byte[] domain, byte[] username, byte[] iv, byte[] n, byte[] signature)
-			throws RemoteException, PublicKeyDoesntExistException, DomainOrUsernameDoesntExistException,
-			SignatureWrongException {
+	public ArrayList<byte[]> get(Key publicKey, byte[] id, byte[] domain, byte[] username, byte[] iv, byte[] n,
+			byte[] signature) throws RemoteException, PublicKeyDoesntExistException,
+			DomainOrUsernameDoesntExistException, SignatureWrongException {
 		// Verify Signature
-		if (!utl.verifySignature(publicKey, signature, publicKey.getEncoded(), domain, username, n, iv)) {
+		if (!utl.verifySignature(publicKey, signature, publicKey.getEncoded(), id, domain, username, n, iv)) {
 			throw new SignatureWrongException();
 		}
 
-		byte[] domainDeciphered = null, usernameDeciphered = null, signatureToSend = null, nounceDeciphered = null;
+		byte[] domainDeciphered = null, usernameDeciphered = null, signatureToSend = null, nounceDeciphered = null,
+				idDeciphered = null;
 
 		// Decipher content
 		try {
+			// Decipher ID with Server's private key
+			Cipher decipherID = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+			decipherID.init(Cipher.DECRYPT_MODE, this.privateKey);
+			idDeciphered = decipherID.doFinal(id);
+
+			Session ss = sessionKeyMap.get(idDeciphered);
+
+			// Decipher Nounce with Session key
 			IvParameterSpec ivspec = new IvParameterSpec(iv);
-			Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-			cipher.init(Cipher.DECRYPT_MODE, sessionKeyMap.get(publicKey), ivspec);
-			domainDeciphered = cipher.doFinal(domain);
-			usernameDeciphered = cipher.doFinal(username);
-			nounceDeciphered = cipher.doFinal(n);
+			Cipher decipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+			decipher.init(Cipher.DECRYPT_MODE, ss.getSessionKey(), ivspec);
+
+			domainDeciphered = decipher.doFinal(domain);
+			usernameDeciphered = decipher.doFinal(username);
+			nounceDeciphered = decipher.doFinal(n);
 
 			BigInteger bg = new BigInteger(nounceDeciphered);
 
-			nounce = nounce.shiftLeft(2);
-
-			if (!bg.equals(nounce)) {
+			if (!bg.equals(ss.getNounce().shiftLeft(2))) {
 				throw new InvalidNounceException();
 			}
 
-			nounce = nounce.shiftLeft(2);
+			ss.setNounce(bg);
 
 			byte[] passwordCiphered = null;
 			byte[] nounceCiphered = null;
@@ -319,22 +347,17 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 					// sessionKeyMap.get(publicKey), ivspec);
 
 					// COM ECB
-					cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
-					cipher.init(Cipher.ENCRYPT_MODE, sessionKeyMap.get(publicKey));
-
-					// System.out.println(new
-					// String(tripletList.get(i).getPassword()));
+					Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
+					cipher.init(Cipher.ENCRYPT_MODE, ss.getSessionKey());
 
 					passwordCiphered = cipher.doFinal(tripletList.get(i).getPassword());
-					nounceCiphered = cipher.doFinal(nounce.toByteArray());
+					nounceCiphered = cipher.doFinal(ss.getNounce().toByteArray());
 
 					// Signature contaning [ password, nonce, iv ] signed with
 					// Server's private key
 					signatureToSend = sign(passwordCiphered, nounceCiphered, iv);
 
-					// Create List to send with [ password_ciphered, iv,
-					// signature,
-					// nounce ]
+					// Create List to send with [ password_ciphered, iv,signature,nounce ]
 					ArrayList<byte[]> res = new ArrayList<byte[]>();
 					res.add(passwordCiphered);
 					res.add(nounceCiphered);
@@ -362,7 +385,7 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 		throw new DomainOrUsernameDoesntExistException();
 	}
 
-	// Funtion that signs data with Server's private key
+	// Function that signs data with Server's private key
 	public byte[] sign(byte[]... arrays) throws NoSuchAlgorithmException, InvalidKeyException, SignatureException {
 
 		byte[] toSend = utl.concat(arrays);
