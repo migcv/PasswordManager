@@ -144,7 +144,7 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 			Cipher decipherID = Cipher.getInstance("RSA/ECB/PKCS1Padding");
 			decipherID.init(Cipher.DECRYPT_MODE, this.privateKey);
 			idDecipher = decipherID.doFinal(id);
-			
+
 			BigInteger userID = new BigInteger(idDecipher);
 
 			Session ss = sessionKeyMap.get(userID);
@@ -274,7 +274,7 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 			domainDeciphered = utl.diggestSalt(domainDeciphered, salt);
 			usernameDeciphered = utl.diggestSalt(usernameDeciphered, salt);
 
-			tripletList.add(new Triplet(domainDeciphered, usernameDeciphered, passwordDeciphered, salt));
+			tripletList.add(new Triplet(domainDeciphered, usernameDeciphered, passwordDeciphered, salt, signature));
 		}
 		// Put back the list of triplet in the map
 		publicKeyMap.put(publicKey, tripletList);
@@ -359,11 +359,14 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 					passwordCiphered = cipher.doFinal(tripletList.get(i).getPassword());
 					nounceCiphered = cipher.doFinal(ss.getNounce().toByteArray());
 
+					tripletList.get(i).addSignturesArray(signature);
+
 					// Signature contaning [ password, nonce, iv ] signed with
 					// Server's private key
 					signatureToSend = sign(passwordCiphered, nounceCiphered, iv);
 
-					// Create List to send with [ password_ciphered, iv,signature,nounce ]
+					// Create List to send with [ password_ciphered,
+					// iv,signature,nounce ]
 					ArrayList<byte[]> res = new ArrayList<byte[]>();
 					res.add(passwordCiphered);
 					res.add(nounceCiphered);

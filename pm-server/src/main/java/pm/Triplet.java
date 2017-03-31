@@ -1,6 +1,8 @@
 package pm;
 
 import java.io.Serializable;
+import java.lang.reflect.Array;
+import java.util.ArrayList;
 
 public class Triplet implements Serializable {
 
@@ -9,15 +11,15 @@ public class Triplet implements Serializable {
 	private byte[] domain;
 	private byte[] username;
 	private byte[] password;
-	
 	private byte[] salt;
+	private ArrayList<byte[]> signturesArray = new ArrayList<byte[]>();
 
-	public Triplet(byte[] domain, byte[] username, byte[] password, byte[] salt) { 
-		// guardar a assinatura de tudo para garantir nao repudio toto
+	public Triplet(byte[] domain, byte[] username, byte[] password, byte[] salt, byte[] signature) { 
 		this.setDomain(domain);
 		this.setUsername(username);
 		this.setPassword(password);
 		this.setSalt(salt);
+		addSignturesArray(signature);
 	}
 
 	public byte[] getPassword() {
@@ -50,6 +52,14 @@ public class Triplet implements Serializable {
 
 	public void setSalt(byte[] salt) {
 		this.salt = salt;
+	}
+	
+	public ArrayList<byte[]> getSignturesArray() {
+		return signturesArray;
+	}
+
+	public void addSignturesArray(byte[] signtures) {
+		getSignturesArray().add(signtures);
 	}
 	
 }
