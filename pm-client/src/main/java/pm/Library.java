@@ -23,25 +23,19 @@ import javax.crypto.spec.SecretKeySpec;
 public class Library implements Serializable {
 
 	private static final long serialVersionUID = 1L;
-	
-	private static final int N = 10;
-	private static final int port = 10000;
 
-	private ServerService[] serverArray = new ServerService[N];
+	private ServerService server = null;
 
 	private KeyManagement ck = null;
 
 	private PublicKey serverKey = null;
 	private SecretKey sessionKey = null;
-	
+
 	private BigInteger userID = null;
 
 	private BigInteger nounce = null;
-	
 
 	public void init(char[] password, String alias, KeyStore ks) {
-		
-		ArrayList<byte[]> data = null;
 
 		ck = new KeyManagement();
 
@@ -68,17 +62,18 @@ public class Library implements Serializable {
 		}
 
 		try {
-			for(ServerService server : serverArray) {
-				// data sent ==> [ Client_Public_Key, Signature ]
-				data = server.init(ck.getPublicK(), ck.signature(ck.getPublicK().getEncoded()));
-				// data received ==> [ Server_Public_Key, Session_Key, userID, Nonce, IV, Signature ]
-			}
+			// data sent ==> [ Client_Public_Key, Signature ]
+			ArrayList<byte[]> data = server.init(ck.getPublicK(), ck.signature(ck.getPublicK().getEncoded()));
+			// data received ==> [ Server_Public_Key, Session_Key, userID,
+			// Nonce, IV, Signature ]
 
 			// Server's public key
 			serverKey = KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(data.get(0)));
 
-			// Verifies Signature verifySignature(SK_pub, signature, SK_pub, Ks, userID, Nonce, IV)
-			if (!ck.verifySignature(serverKey, data.get(5), data.get(0), data.get(1), data.get(2), data.get(3), data.get(4))) {
+			// Verifies Signature verifySignature(SK_pub, signature, SK_pub, Ks,
+			// userID, Nonce, IV)
+			if (!ck.verifySignature(serverKey, data.get(5), data.get(0), data.get(1), data.get(2), data.get(3),
+					data.get(4))) {
 				System.out.println("init: signature wrong!");
 				return;
 			}
@@ -99,7 +94,7 @@ public class Library implements Serializable {
 
 			// UserID ciphered
 			byte[] userIDCiphered = data.get(2);
-			
+
 			// Nounce ciphered
 			byte[] nounceCiphered = data.get(3);
 
@@ -108,10 +103,10 @@ public class Library implements Serializable {
 			simetricCipher.init(Cipher.DECRYPT_MODE, sessionKey, ivspec);
 			byte[] userIDDeciphered = simetricCipher.doFinal(userIDCiphered);
 			byte[] nounceDeciphered = simetricCipher.doFinal(nounceCiphered);
-			
+
 			// Store UserID
 			userID = new BigInteger(userIDDeciphered);
-			
+
 			// Store given nonce
 			nounce = new BigInteger(nounceDeciphered);
 
@@ -147,7 +142,7 @@ public class Library implements Serializable {
 
 			// Increment nounce
 			nounce = nounce.shiftLeft(2);
-			
+
 			// Cipher userID w/ server_pub_key
 			Cipher assimetricCipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
 			assimetricCipher.init(Cipher.ENCRYPT_MODE, serverKey);
@@ -157,16 +152,15 @@ public class Library implements Serializable {
 			// Cipher nounce w/ session_key
 			Cipher simetricCipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
 			simetricCipher.init(Cipher.ENCRYPT_MODE, sessionKey, ivspec);
-			
+
 			byte[] nounceCiphered = simetricCipher.doFinal(nounce.toByteArray());
 
 			// Signature of all data [ CKpub, E(userID), E(nonce) & IV ]
 			byte[] signature = ck.signature(ck.getPublicK().getEncoded(), userIDCiphered, nounceCiphered, iv);
 
-			for(ServerService server : serverArray) {
-				// data sent ==> [ Client_Public_Key, User_ID, Nounce, IV, Signature ]
-				server.register(ck.getPublicK(), userIDCiphered, nounceCiphered, iv, signature);
-			}
+			// data sent ==> [ Client_Public_Key, User_ID, Nounce, IV, Signature
+			// ]
+			server.register(ck.getPublicK(), userIDCiphered, nounceCiphered, iv, signature);
 			System.out.println("register: user registered!");
 
 		} catch (RemoteException e) {
@@ -191,7 +185,8 @@ public class Library implements Serializable {
 
 	public void save_password(byte[] domain, byte[] username, byte[] password) {
 
-		byte[] userIDCiphered = null, passCiphered = null, domainCiphered = null, usernameCiphered = null, nounceCiphered = null;
+		byte[] userIDCiphered = null, passCiphered = null, domainCiphered = null, usernameCiphered = null,
+				nounceCiphered = null;
 
 		nounce = nounce.shiftLeft(2);
 
@@ -199,12 +194,12 @@ public class Library implements Serializable {
 			// Cipher UserID & Password with Public Key
 			Cipher assimetricCipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
 			assimetricCipher.init(Cipher.ENCRYPT_MODE, serverKey);
-			
+
 			userIDCiphered = assimetricCipher.doFinal(userID.toByteArray());
-			
+
 			assimetricCipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
 			assimetricCipher.init(Cipher.ENCRYPT_MODE, ck.getPublicK());
-			
+
 			passCiphered = assimetricCipher.doFinal(password);
 
 			// Generate a random IV
@@ -229,11 +224,11 @@ public class Library implements Serializable {
 			// Signature of all data [ E(H(domain)), E(H(username)),
 			// E(E(password)) & IV ]
 			byte[] signature = ck.signature(userIDCiphered, domainCiphered, usernameCiphered, passCiphered, iv);
-			
-			for(ServerService server : serverArray) {
-				// Data sending ==> [ CKpub, User_ID, E(H(domain)), E(H(username)), E(E(password)), IV, signature ]
-				server.put(ck.getPublicK(), userIDCiphered, domainCiphered, usernameCiphered, passCiphered, iv, nounceCiphered, signature);
-			}
+
+			// Data sending ==> [ CKpub, User_ID, E(H(domain)), E(H(username)),
+			// E(E(password)), IV, signature ]
+			server.put(ck.getPublicK(), userIDCiphered, domainCiphered, usernameCiphered, passCiphered, iv,
+					nounceCiphered, signature);
 
 		} catch (RemoteException e) {
 			e.printStackTrace();
@@ -256,7 +251,8 @@ public class Library implements Serializable {
 
 	public byte[] retrieve_password(byte[] domain, byte[] username) {
 
-		byte[] password = null, password_aux = null, userIDCiphered = null, domainEncryp = null, usernameEncryp = null, nounceEncryp = null;
+		byte[] password = null, password_aux = null, userIDCiphered = null, domainEncryp = null, usernameEncryp = null,
+				nounceEncryp = null;
 		ArrayList<byte[]> data = new ArrayList<byte[]>();
 
 		nounce = nounce.shiftLeft(2);
@@ -265,9 +261,9 @@ public class Library implements Serializable {
 			// Cipher UserID & Password with Public Key
 			Cipher assimetricCipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
 			assimetricCipher.init(Cipher.ENCRYPT_MODE, serverKey);
-			
+
 			userIDCiphered = assimetricCipher.doFinal(userID.toByteArray());
-			
+
 			// Generate a random IV
 			SecureRandom random = new SecureRandom();
 			byte[] iv = new byte[16];
@@ -286,16 +282,19 @@ public class Library implements Serializable {
 			usernameEncryp = simetricCipher.doFinal(usernameHash);
 			nounceEncryp = simetricCipher.doFinal(nounce.toByteArray());
 
-			// Signature of all data Public_Key, E(H(domain)), E(H(username)), E(Nonce) & IV
-			byte[] signature = ck.signature(ck.getPublicK().getEncoded(), userIDCiphered, domainEncryp, usernameEncryp, nounceEncryp, iv);
+			// Signature of all data Public_Key, E(H(domain)), E(H(username)),
+			// E(Nonce) & IV
+			byte[] signature = ck.signature(ck.getPublicK().getEncoded(), userIDCiphered, domainEncryp, usernameEncryp,
+					nounceEncryp, iv);
 
-			for(ServerService server : serverArray) {
-				// Data sending ==> [ CKpub, E(H(domain)), E(H(username)), IV, nounce, signature ]
-				data = server.get(ck.getPublicK(), userIDCiphered, domainEncryp, usernameEncryp, iv, nounceEncryp, signature);
-				// Data received ==> [ password, nounce, iv, signature ]
-			}
+			// Data sending ==> [ CKpub, E(H(domain)), E(H(username)), IV,
+			// nounce, signature ]
+			data = server.get(ck.getPublicK(), userIDCiphered, domainEncryp, usernameEncryp, iv, nounceEncryp,
+					signature);
+			// Data received ==> [ password, nounce, iv, signature ]
 
-			// Verifies Signature - verifySignature(public_key, signature, password, nonce, iv)
+			// Verifies Signature - verifySignature(public_key, signature,
+			// password, nonce, iv)
 			if (!ck.verifySignature(serverKey, data.get(3), data.get(0), data.get(1), data.get(2))) {
 				throw new SignatureWrongException();
 			}
@@ -336,7 +335,7 @@ public class Library implements Serializable {
 			if (!bg.equals(nounce.shiftLeft(2))) {
 				throw new InvalidNounceException();
 			}
-			
+
 			nounce = nounce.shiftLeft(2);
 
 		} catch (RemoteException e) {
@@ -361,7 +360,7 @@ public class Library implements Serializable {
 	}
 
 	public void close() {
-		serverArray = null;
+		server = null;
 		ck = null;
 		serverKey = null;
 		sessionKey = null;
@@ -374,10 +373,8 @@ public class Library implements Serializable {
 			System.setSecurityManager(new SecurityManager());
 		}
 		try {
-			for(int i = 0; i < N; i++) {
-				serverArray[i] = (ServerService) Naming.lookup("//localhost:" + (port + i) +"/ServerService");
-				System.out.println("Server " + (port + i) + " found!");
-			}
+			server = (ServerService) Naming.lookup("//localhost:10000/ServerService");
+			System.out.println("Server found!");
 		} catch (Exception e) {
 			System.out.println("Ups...something is wrong: " + e.getMessage());
 		}

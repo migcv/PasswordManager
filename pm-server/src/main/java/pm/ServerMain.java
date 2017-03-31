@@ -14,25 +14,24 @@ public class ServerMain {
 		int registryPort = 10000;
 		System.setSecurityManager(new SecurityManager());
 		ServerService server = null;
-		
+
 		System.out.println("Launching " + N + " servers!");
 
 		// Load the state of the server
 		server = loadState();
-		for (int i = 0; i < N; i++) {
-			try {
-				// If the load returned null, create new Server instance
-				if (server == null) {
-					server = new Server();
-				}
-				// Registry Server
-				Registry reg = LocateRegistry.createRegistry(registryPort + i);
-				reg.rebind("ServerService", server);
-				System.out.println("Password Manager Server ready, port: " + registryPort + i);
-			} catch (Exception e) {
-				System.out.println("Ups...something is wrong: " + e.getMessage());
-				e.printStackTrace();
+		// for (int i = 0; i < N; i++) {
+		try {
+			// If the load returned null, create new Server instance
+			if (server == null) {
+				server = new Server();
 			}
+			// Registry Server
+			Registry reg = LocateRegistry.createRegistry(registryPort);
+			reg.rebind("ServerService", server);
+			System.out.println("Password Manager Server ready, port: " + registryPort);
+		} catch (Exception e) {
+			System.out.println("Ups...something is wrong: " + e.getMessage());
+			e.printStackTrace();
 		}
 	}
 
@@ -46,7 +45,7 @@ public class ServerMain {
 			in.close();
 			fileIn.close();
 			return server;
-		} catch (IOException i) {
+		} catch (IOException e) {
 			System.out.println("File not found, generating new Server instance!");
 		} catch (ClassNotFoundException c) {
 			System.out.println("ServerService class not found");
