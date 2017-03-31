@@ -23,8 +23,11 @@ import javax.crypto.spec.SecretKeySpec;
 public class Library implements Serializable {
 
 	private static final long serialVersionUID = 1L;
+	
+	private static final int N = 10;
+	private static final int port = 10000;
 
-	private ServerService server = null;
+	private ServerService[] serverArray = new ServerService[N];
 
 	private KeyManagement ck = null;
 
@@ -37,6 +40,8 @@ public class Library implements Serializable {
 	
 
 	public void init(char[] password, String alias, KeyStore ks) {
+		
+		ArrayList<byte[]> data = null;
 
 		ck = new KeyManagement();
 
@@ -63,9 +68,11 @@ public class Library implements Serializable {
 		}
 
 		try {
-			// data sent ==> [ Client_Public_Key, Signature ]
-			ArrayList<byte[]> data = server.init(ck.getPublicK(), ck.signature(ck.getPublicK().getEncoded()));
-			// data received ==> [ Server_Public_Key, Session_Key, userID, Nonce, IV, Signature ]
+			for(ServerService server : serverArray) {
+				// data sent ==> [ Client_Public_Key, Signature ]
+				data = server.init(ck.getPublicK(), ck.signature(ck.getPublicK().getEncoded()));
+				// data received ==> [ Server_Public_Key, Session_Key, userID, Nonce, IV, Signature ]
+			}
 
 			// Server's public key
 			serverKey = KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(data.get(0)));
@@ -156,8 +163,10 @@ public class Library implements Serializable {
 			// Signature of all data [ CKpub, E(userID), E(nonce) & IV ]
 			byte[] signature = ck.signature(ck.getPublicK().getEncoded(), userIDCiphered, nounceCiphered, iv);
 
-			// data sent ==> [ Client_Public_Key, User_ID, Nounce, IV, Signature ]
-			server.register(ck.getPublicK(), userIDCiphered, nounceCiphered, iv, signature);
+			for(ServerService server : serverArray) {
+				// data sent ==> [ Client_Public_Key, User_ID, Nounce, IV, Signature ]
+				server.register(ck.getPublicK(), userIDCiphered, nounceCiphered, iv, signature);
+			}
 			System.out.println("register: user registered!");
 
 		} catch (RemoteException e) {
@@ -220,9 +229,11 @@ public class Library implements Serializable {
 			// Signature of all data [ E(H(domain)), E(H(username)),
 			// E(E(password)) & IV ]
 			byte[] signature = ck.signature(userIDCiphered, domainCiphered, usernameCiphered, passCiphered, iv);
-
-			// Data sending ==> [ CKpub, User_ID, E(H(domain)), E(H(username)), E(E(password)), IV, signature ]
-			server.put(ck.getPublicK(), userIDCiphered, domainCiphered, usernameCiphered, passCiphered, iv, nounceCiphered, signature);
+			
+			for(ServerService server : serverArray) {
+				// Data sending ==> [ CKpub, User_ID, E(H(domain)), E(H(username)), E(E(password)), IV, signature ]
+				server.put(ck.getPublicK(), userIDCiphered, domainCiphered, usernameCiphered, passCiphered, iv, nounceCiphered, signature);
+			}
 
 		} catch (RemoteException e) {
 			e.printStackTrace();
@@ -278,9 +289,11 @@ public class Library implements Serializable {
 			// Signature of all data Public_Key, E(H(domain)), E(H(username)), E(Nonce) & IV
 			byte[] signature = ck.signature(ck.getPublicK().getEncoded(), userIDCiphered, domainEncryp, usernameEncryp, nounceEncryp, iv);
 
-			// Data sending ==> [ CKpub, E(H(domain)), E(H(username)), IV, nounce, signature ]
-			data = server.get(ck.getPublicK(), userIDCiphered, domainEncryp, usernameEncryp, iv, nounceEncryp, signature);
-			// Data received ==> [ password, nounce, iv, signature ]
+			for(ServerService server : serverArray) {
+				// Data sending ==> [ CKpub, E(H(domain)), E(H(username)), IV, nounce, signature ]
+				data = server.get(ck.getPublicK(), userIDCiphered, domainEncryp, usernameEncryp, iv, nounceEncryp, signature);
+				// Data received ==> [ password, nounce, iv, signature ]
+			}
 
 			// Verifies Signature - verifySignature(public_key, signature, password, nonce, iv)
 			if (!ck.verifySignature(serverKey, data.get(3), data.get(0), data.get(1), data.get(2))) {
@@ -348,7 +361,7 @@ public class Library implements Serializable {
 	}
 
 	public void close() {
-		server = null;
+		serverArray = null;
 		ck = null;
 		serverKey = null;
 		sessionKey = null;
@@ -361,8 +374,10 @@ public class Library implements Serializable {
 			System.setSecurityManager(new SecurityManager());
 		}
 		try {
-			server = (ServerService) Naming.lookup("//localhost:10000/ServerService");
-			System.out.println("Server found!");
+			for(int i = 0; i < N; i++) {
+				serverArray[i] = (ServerService) Naming.lookup("//localhost:" + (port + i) +"/ServerService");
+				System.out.println("Server " + (port + i) + " found!");
+			}
 		} catch (Exception e) {
 			System.out.println("Ups...something is wrong: " + e.getMessage());
 		}

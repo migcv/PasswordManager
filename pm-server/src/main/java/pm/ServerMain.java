@@ -14,6 +14,8 @@ public class ServerMain {
 		int registryPort = 10000;
 		System.setSecurityManager(new SecurityManager());
 		ServerService server = null;
+		
+		System.out.println("Launching " + N + " servers!");
 
 		// Load the state of the server
 		server = loadState();
@@ -26,7 +28,7 @@ public class ServerMain {
 				// Registry Server
 				Registry reg = LocateRegistry.createRegistry(registryPort + i);
 				reg.rebind("ServerService", server);
-				System.out.println("Password Manager Server ready!" + registryPort + i);
+				System.out.println("Password Manager Server ready, port: " + registryPort + i);
 			} catch (Exception e) {
 				System.out.println("Ups...something is wrong: " + e.getMessage());
 				e.printStackTrace();
