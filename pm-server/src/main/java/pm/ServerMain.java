@@ -19,19 +19,20 @@ public class ServerMain {
 
 		// Load the state of the server
 		server = loadState();
-		// for (int i = 0; i < N; i++) {
-		try {
-			// If the load returned null, create new Server instance
-			if (server == null) {
-				server = new Server();
+		for (int i = 0; i < N; i++) {
+			try {
+				// If the load returned null, create new Server instance
+				if (server == null) {
+					server = new Server();
+				}
+				// Registry Server
+				Registry reg = LocateRegistry.createRegistry(registryPort + i);
+				reg.rebind("ServerService", server);
+				System.out.println("Password Manager Server ready, port: " + registryPort + i);
+			} catch (Exception e) {
+				System.out.println("Ups...something is wrong: " + e.getMessage());
+				e.printStackTrace();
 			}
-			// Registry Server
-			Registry reg = LocateRegistry.createRegistry(registryPort);
-			reg.rebind("ServerService", server);
-			System.out.println("Password Manager Server ready, port: " + registryPort);
-		} catch (Exception e) {
-			System.out.println("Ups...something is wrong: " + e.getMessage());
-			e.printStackTrace();
 		}
 	}
 
