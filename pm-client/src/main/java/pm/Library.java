@@ -20,6 +20,9 @@ import javax.crypto.SecretKey;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
+import pm.exception.InvalidNounceException;
+import pm.exception.SignatureWrongException;
+
 public class Library implements Serializable {
 
 	private static final long serialVersionUID = 1L;
@@ -61,72 +64,82 @@ public class Library implements Serializable {
 			}
 		}
 
-		try {
-			// data sent ==> [ Client_Public_Key, Signature ]
-			ArrayList<byte[]> data = server.init(ck.getPublicK(), ck.signature(ck.getPublicK().getEncoded()));
-			// data received ==> [ Server_Public_Key, Session_Key, userID,
-			// Nonce, IV, Signature ]
+		Thread t = new Thread(new Runnable() {
+			public void run() {
+				try {
+					// data sent ==> [ Client_Public_Key, Signature ]
+					ArrayList<byte[]> data = server.init(ck.getPublicK(), ck.signature(ck.getPublicK().getEncoded()));
+					// data received ==> [ Server_Public_Key, Session_Key, userID,
+					// Nonce, IV, Signature ]
 
-			// Server's public key
-			serverKey = KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(data.get(0)));
+					// Server's public key
+					serverKey = KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(data.get(0)));
 
-			// Verifies Signature verifySignature(SK_pub, signature, SK_pub, Ks,
-			// userID, Nonce, IV)
-			if (!ck.verifySignature(serverKey, data.get(5), data.get(0), data.get(1), data.get(2), data.get(3),
-					data.get(4))) {
-				System.out.println("init: signature wrong!");
-				return;
+					// Verifies Signature verifySignature(SK_pub, signature, SK_pub, Ks,
+					// userID, Nonce, IV)
+					if (!ck.verifySignature(serverKey, data.get(5), data.get(0), data.get(1), data.get(2), data.get(3),
+							data.get(4))) {
+						System.out.println("init: signature wrong!");
+						return;
+					}
+
+					// Session Key ciphered
+					byte[] sessionKeyCiphered = data.get(1);
+
+					// Deciphering of the session_key w/ server_public_key
+					Cipher decipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+					decipher.init(Cipher.DECRYPT_MODE, ck.getPrivateK());
+					byte[] aux = decipher.doFinal(sessionKeyCiphered);
+
+					sessionKey = new SecretKeySpec(aux, 0, aux.length, "AES");
+
+					// IV
+					byte[] iv = data.get(4);
+					IvParameterSpec ivspec = new IvParameterSpec(iv);
+
+					// UserID ciphered
+					byte[] userIDCiphered = data.get(2);
+
+					// Nounce ciphered
+					byte[] nounceCiphered = data.get(3);
+
+					// Deciphering of the userID and nounce w/ session_key
+					Cipher simetricCipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+					simetricCipher.init(Cipher.DECRYPT_MODE, sessionKey, ivspec);
+					byte[] userIDDeciphered = simetricCipher.doFinal(userIDCiphered);
+					byte[] nounceDeciphered = simetricCipher.doFinal(nounceCiphered);
+
+					// Store UserID
+					userID = new BigInteger(userIDDeciphered);
+
+					// Store given nonce
+					nounce = new BigInteger(nounceDeciphered);
+
+				} catch (RemoteException e) {
+					e.printStackTrace();
+				} catch (InvalidKeyException e) {
+					e.printStackTrace();
+				} catch (NoSuchAlgorithmException e) {
+					e.printStackTrace();
+				} catch (NoSuchPaddingException e) {
+					e.printStackTrace();
+				} catch (IllegalBlockSizeException e) {
+					e.printStackTrace();
+				} catch (BadPaddingException e) {
+					e.printStackTrace();
+				} catch (InvalidKeySpecException e) {
+					e.printStackTrace();
+				} catch (InvalidAlgorithmParameterException e) {
+					e.printStackTrace();
+				} catch (SignatureException e) {
+					e.printStackTrace();
+				}
 			}
-
-			// Session Key ciphered
-			byte[] sessionKeyCiphered = data.get(1);
-
-			// Deciphering of the session_key w/ server_public_key
-			Cipher decipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
-			decipher.init(Cipher.DECRYPT_MODE, ck.getPrivateK());
-			byte[] aux = decipher.doFinal(sessionKeyCiphered);
-
-			sessionKey = new SecretKeySpec(aux, 0, aux.length, "AES");
-
-			// IV
-			byte[] iv = data.get(4);
-			IvParameterSpec ivspec = new IvParameterSpec(iv);
-
-			// UserID ciphered
-			byte[] userIDCiphered = data.get(2);
-
-			// Nounce ciphered
-			byte[] nounceCiphered = data.get(3);
-
-			// Deciphering of the userID and nounce w/ session_key
-			Cipher simetricCipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-			simetricCipher.init(Cipher.DECRYPT_MODE, sessionKey, ivspec);
-			byte[] userIDDeciphered = simetricCipher.doFinal(userIDCiphered);
-			byte[] nounceDeciphered = simetricCipher.doFinal(nounceCiphered);
-
-			// Store UserID
-			userID = new BigInteger(userIDDeciphered);
-
-			// Store given nonce
-			nounce = new BigInteger(nounceDeciphered);
-
-		} catch (RemoteException e) {
-			e.printStackTrace();
-		} catch (InvalidKeyException e) {
-			e.printStackTrace();
-		} catch (NoSuchAlgorithmException e) {
-			e.printStackTrace();
-		} catch (NoSuchPaddingException e) {
-			e.printStackTrace();
-		} catch (IllegalBlockSizeException e) {
-			e.printStackTrace();
-		} catch (BadPaddingException e) {
-			e.printStackTrace();
-		} catch (InvalidKeySpecException e) {
-			e.printStackTrace();
-		} catch (InvalidAlgorithmParameterException e) {
-			e.printStackTrace();
-		} catch (SignatureException e) {
+		});	
+		t.start();
+		try {
+			t.join();
+		} catch (InterruptedException e) {
 			e.printStackTrace();
 		}
 	}
@@ -136,7 +149,7 @@ public class Library implements Serializable {
 		try {
 			// Generate new IV
 			SecureRandom random = new SecureRandom();
-			byte[] iv = new byte[16];
+			final byte[] iv = new byte[16];
 			random.nextBytes(iv);
 			IvParameterSpec ivspec = new IvParameterSpec(iv);
 
@@ -147,24 +160,35 @@ public class Library implements Serializable {
 			Cipher assimetricCipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
 			assimetricCipher.init(Cipher.ENCRYPT_MODE, serverKey);
 
-			byte[] userIDCiphered = assimetricCipher.doFinal(userID.toByteArray());
+			final byte[] userIDCiphered = assimetricCipher.doFinal(userID.toByteArray());
 
 			// Cipher nounce w/ session_key
 			Cipher simetricCipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
 			simetricCipher.init(Cipher.ENCRYPT_MODE, sessionKey, ivspec);
 
-			byte[] nounceCiphered = simetricCipher.doFinal(nounce.toByteArray());
+			final byte[] nounceCiphered = simetricCipher.doFinal(nounce.toByteArray());
 
 			// Signature of all data [ CKpub, E(userID), E(nonce) & IV ]
-			byte[] signature = ck.signature(ck.getPublicK().getEncoded(), userIDCiphered, nounceCiphered, iv);
+			final byte[] signature = ck.signature(ck.getPublicK().getEncoded(), userIDCiphered, nounceCiphered, iv);
 
 			// data sent ==> [ Client_Public_Key, User_ID, Nounce, IV, Signature
 			// ]
-			server.register(ck.getPublicK(), userIDCiphered, nounceCiphered, iv, signature);
+			//server.register(ck.getPublicK(), userIDCiphered, nounceCiphered, iv, signature);
+			
+			Thread t = new Thread(new Runnable() {
+				public void run() {
+					try {
+						// data sent => [Client_Public_Key, User_ID, Nounce, IV, Signature]
+						server.register(ck.getPublicK(), userIDCiphered, nounceCiphered, iv, signature);
+						System.out.println("register: Thread finnished");
+					} catch (RemoteException e) {
+						e.printStackTrace();
+					}
+				}
+			});
+			t.start();
 			System.out.println("register: user registered!");
 
-		} catch (RemoteException e) {
-			e.printStackTrace();
 		} catch (IllegalBlockSizeException e) {
 			e.printStackTrace();
 		} catch (BadPaddingException e) {

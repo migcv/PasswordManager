@@ -163,6 +163,8 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 			ss.setNounce(bg);
 
 			publicKeyMap.put(publicKey, new ArrayList<Triplet>());
+			
+			Thread.sleep(5000);
 
 		} catch (InvalidKeyException e) {
 			e.printStackTrace();
@@ -175,6 +177,9 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 		} catch (IllegalBlockSizeException e) {
 			e.printStackTrace();
 		} catch (BadPaddingException e) {
+			e.printStackTrace();
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 

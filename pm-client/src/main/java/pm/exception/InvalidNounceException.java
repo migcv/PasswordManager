@@ -1,4 +1,4 @@
-package pm;
+package pm.exception;
 
 public class InvalidNounceException extends RuntimeException {
 
