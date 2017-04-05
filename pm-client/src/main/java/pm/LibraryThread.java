@@ -1,14 +1,10 @@
 package pm;
 
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
 import java.io.Serializable;
 import java.math.BigInteger;
 import java.rmi.Naming;
 import java.rmi.RemoteException;
 import java.security.*;
-import java.security.cert.CertificateException;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.ArrayList;
@@ -51,7 +47,11 @@ public class LibraryThread implements Serializable, Runnable {
 		while (true) {
 			System.out.println(port + " WAITING REQUEST " + requestID);
 			while(lb.getRequestSize() <= requestID) {
-				
+				try {
+					Thread.sleep(250);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
 			}
 			Object[] request = lb.getRequest(requestID+1);
 			System.out.println(port + " REQUEST: " + request[0] +" "+ request[1]);
@@ -59,22 +59,22 @@ public class LibraryThread implements Serializable, Runnable {
 				System.out.println(port + " INIT");
 				init((char[]) request[2], (String) request[3], (KeyStore) request[4]);
 				requestID = ((Integer) request[0]).intValue();
-				lb.addResponse(port, true);
+				lb.addResponse(port, requestID, true);
 			} else if (request[1].equals("register_user")) {
 				System.out.println(port + " REGISTER_USER");
 				register_user();
 				requestID = ((Integer) request[0]).intValue();
-				lb.addResponse(port, true);
+				lb.addResponse(port, requestID, true);
 			} else if (request[1].equals("save_password")) {
 				System.out.println(port + " SAVE_PASSWORD");
 				save_password((byte[]) request[2], (byte[]) request[3], (byte[]) request[4]);
 				requestID = ((Integer) request[0]).intValue();
-				lb.addResponse(port, true);
+				lb.addResponse(port, requestID, true);
 			} else if (request[1].equals("retrieve_password")) {
 				System.out.println(port + " RETRIVE_PASSWORD");
 				byte[] pw = retrieve_password((byte[]) request[2], (byte[]) request[3]);
 				requestID = ((Integer) request[0]).intValue();
-				lb.addResponse(port, pw);
+				lb.addResponse(port, requestID, pw);
 			}
 			
 		}

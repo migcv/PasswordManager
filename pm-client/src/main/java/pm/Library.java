@@ -8,7 +8,6 @@ import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateException;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class Library {
@@ -80,8 +79,10 @@ public class Library {
 		return response;
 	}
 
-	public void addResponse(Integer port, Object value) {
-		response.put(port, value);
+	public void addResponse(Integer port, Integer id, Object value) {
+		if(requestID == id) {
+			response.put(port, value);
+		}
 	}
 
 	public KeyStore getInstanceOfKeyStore(char[] password, String alias) {

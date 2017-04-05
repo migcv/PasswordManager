@@ -30,6 +30,8 @@ public class Client {
 		System.out.println("retrieve: [ www.google.com, Alice ] ==> " + new String(c.retrieve_password("www.google.com".getBytes(), "Alice".getBytes()), "UTF-8"));
 		
 		c.close();
+		
+		System.exit(0);
 
 	}
 
