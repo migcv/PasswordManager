@@ -8,6 +8,7 @@ import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class Library {
@@ -56,11 +57,26 @@ public class Library {
 	}
 
 	public byte[] retrieve_password(byte[] domain, byte[] username) {
+		Object res = null;
+		Integer total = 0;
 		response = new ConcurrentHashMap<Integer, Object>();
 		requestID++;
 		request.put(requestID, new Object[] { requestID, "retrieve_password", domain, username });
-		while(response.size() < N);
-		return (byte[])response.get(10000);
+		while(response.size() < N/2 && total < N/2) {
+			HashMap<Object, Integer> majority = new HashMap<Object, Integer>();
+			for(Object values : response.values()) {
+				if(majority.get(values) == null) {
+					majority.put(values, 1);
+				} else {
+					majority.put(values, majority.get(values)+1);
+				}
+				if(majority.get(values) > total) {
+					total = majority.get(values);
+					res = values;
+				}
+			}
+		}
+		return (byte[])res;
 	}
 
 	public void close() {
