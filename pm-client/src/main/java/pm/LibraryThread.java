@@ -40,14 +40,44 @@ public class LibraryThread implements Serializable, Runnable {
 	private int port;
 	private Library lb;
 
+	private int requestID = 0;
+
 	public LibraryThread(int port, Library lb) {
 		this.port = port;
 		this.lb = lb;
 	}
 
 	public void run() {
-		// TODO Auto-generated method stub
-
+		while (true) {
+			System.out.println(port + " WAITING REQUEST " + requestID);
+			while(lb.getRequestSize() <= requestID) {
+				
+			}
+			Object[] request = lb.getRequest(requestID+1);
+			System.out.println(port + " REQUEST: " + request[0] +" "+ request[1]);
+			if (request[1].equals("init")) {
+				System.out.println(port + " INIT");
+				init((char[]) request[2], (String) request[3], (KeyStore) request[4]);
+				requestID = ((Integer) request[0]).intValue();
+				lb.addResponse(port, true);
+			} else if (request[1].equals("register_user")) {
+				System.out.println(port + " REGISTER_USER");
+				register_user();
+				requestID = ((Integer) request[0]).intValue();
+				lb.addResponse(port, true);
+			} else if (request[1].equals("save_password")) {
+				System.out.println(port + " SAVE_PASSWORD");
+				save_password((byte[]) request[2], (byte[]) request[3], (byte[]) request[4]);
+				requestID = ((Integer) request[0]).intValue();
+				lb.addResponse(port, true);
+			} else if (request[1].equals("retrieve_password")) {
+				System.out.println(port + " RETRIVE_PASSWORD");
+				byte[] pw = retrieve_password((byte[]) request[2], (byte[]) request[3]);
+				requestID = ((Integer) request[0]).intValue();
+				lb.addResponse(port, pw);
+			}
+			
+		}
 	}
 
 	public void init(char[] password, String alias, KeyStore ks) {
@@ -388,7 +418,7 @@ public class LibraryThread implements Serializable, Runnable {
 		}
 		try {
 			server = (ServerService) Naming.lookup("//localhost:" + port + "/ServerService");
-			System.out.println("Server found!");
+			System.out.println("Server found!, Port: " + port);
 		} catch (Exception e) {
 			System.out.println("Ups...something is wrong: " + e.getMessage());
 		}

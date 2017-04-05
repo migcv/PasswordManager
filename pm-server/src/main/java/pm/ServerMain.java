@@ -7,7 +7,7 @@ import java.rmi.registry.*;
 
 public class ServerMain {
 
-	protected static int N = 10;
+	protected static int N = 4;
 
 	public static void main(String[] args) {
 
