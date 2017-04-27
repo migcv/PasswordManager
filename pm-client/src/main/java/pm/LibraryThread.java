@@ -45,7 +45,6 @@ public class LibraryThread implements Serializable, Runnable {
 
 	public void run() {
 		while (true) {
-			System.out.println(port + " WAITING REQUEST " + requestID);
 			while (lb.getRequestSize() <= requestID) {
 				try {
 					Thread.sleep(250);
@@ -56,22 +55,18 @@ public class LibraryThread implements Serializable, Runnable {
 			Object[] request = lb.getRequest(requestID + 1);
 			System.out.println(port + " REQUEST: " + request[0] + " " + request[1]);
 			if (request[1].equals("init")) {
-				System.out.println(port + " INIT");
 				BigInteger timestamp = init((char[]) request[2], (String) request[3], (KeyStore) request[4]);
 				requestID = ((Integer) request[0]).intValue();
 				lb.addResponse(port, requestID, timestamp);
 			} else if (request[1].equals("register_user")) {
-				System.out.println(port + " REGISTER_USER");
 				register_user();
 				requestID = ((Integer) request[0]).intValue();
 				lb.addResponse(port, requestID, true);
 			} else if (request[1].equals("save_password")) {
-				System.out.println(port + " SAVE_PASSWORD");
 				save_password((byte[]) request[2], (byte[]) request[3], (byte[]) request[4], (byte[]) request[5]);
 				requestID = ((Integer) request[0]).intValue();
 				lb.addResponse(port, requestID, true);
 			} else if (request[1].equals("retrieve_password")) {
-				System.out.println(port + " RETRIVE_PASSWORD");
 				byte[] pw = retrieve_password((byte[]) request[2], (byte[]) request[3]);
 				requestID = ((Integer) request[0]).intValue();
 				lb.addResponse(port, requestID, pw);
@@ -312,7 +307,7 @@ public class LibraryThread implements Serializable, Runnable {
 	public byte[] retrieve_password(byte[] domain, byte[] username) {
 
 		byte[] password = null, password_aux = null, userIDCiphered = null, domainEncryp = null, usernameEncryp = null,
-				nounceEncryp = null;
+				nounceEncryp = null, timestampDecipher = null, valueSignatureDecipher = null;
 		ArrayList<byte[]> data = new ArrayList<byte[]>();
 
 		nounce = nounce.shiftLeft(2);
@@ -351,22 +346,26 @@ public class LibraryThread implements Serializable, Runnable {
 			// nounce, signature ]
 			data = server.get(ck.getPublicK(), userIDCiphered, domainEncryp, usernameEncryp, iv, nounceEncryp,
 					signature);
-			// Data received ==> [ password, nounce, iv, signature ]
+			// Data received ==> [ password, timestamp, valueSignature, nounce, iv, signature ]
 
 			// Verifies Signature - verifySignature(public_key, signature,
 			// password, nonce, iv)
-			if (!ck.verifySignature(serverKey, data.get(3), data.get(0), data.get(1), data.get(2))) {
+			if (!ck.verifySignature(serverKey, data.get(5), data.get(0), data.get(1), data.get(2), data.get(3), data.get(4))) {
 				throw new SignatureWrongException();
 			}
 
 			// Extracting IV
 			byte[] passwordCipher = data.get(0);
-			iv = data.get(2);
+			
+			byte[] timestampCipher = data.get(1);
+			
+			byte[] valueSignature = data.get(2);
+			iv = data.get(4);
 
 			ivspec = new IvParameterSpec(iv);
 
 			// Extracting nounce
-			nounceEncryp = data.get(1);
+			nounceEncryp = data.get(3);
 			byte[] nounceDeciphered = null;
 
 			// Decipher password with Session Key
@@ -381,7 +380,12 @@ public class LibraryThread implements Serializable, Runnable {
 			simetricDecipher.init(Cipher.DECRYPT_MODE, sessionKey);
 
 			password_aux = simetricDecipher.doFinal(passwordCipher);
+			timestampDecipher = simetricDecipher.doFinal(timestampCipher);
 			nounceDeciphered = simetricDecipher.doFinal(nounceEncryp);
+			
+			if (!ck.verifySignature(ck.getPublicK(), valueSignature, domainHash, usernameHash, password_aux, timestampDecipher)) {
+				throw new SignatureWrongException();
+			}
 
 			// Decipher Password with Private Key
 			Cipher assimetricDecipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");

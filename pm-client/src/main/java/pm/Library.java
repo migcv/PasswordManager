@@ -14,10 +14,13 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class Library {
 
-	protected static int N = 4;
-	protected static int PORT = 10000;
+	protected static final int F = 2;
+	
+	protected static int N_SERVERS;
+	
+	protected static final int PORT = 10000;
 
-	private ArrayList<Thread> threadArray = new ArrayList<Thread>(N);
+	private ArrayList<Thread> threadArray = new ArrayList<Thread>(N_SERVERS);
 	private int requestID = 0;
 	private ConcurrentHashMap<Integer, Object[]> request = new ConcurrentHashMap<Integer, Object[]>();
 	private boolean end = false;
@@ -27,7 +30,9 @@ public class Library {
 	private BigInteger timestamp;
 
 	public Library() {
-		for (int i = 0; i < N; i++) {
+		N_SERVERS = F * 3 + 1;
+		
+		for (int i = 0; i < N_SERVERS; i++) {
 			Thread td = new Thread(new LibraryThread(PORT + i, this), Integer.toString(PORT + i));
 			td.start();
 			threadArray.add(td);
@@ -42,7 +47,7 @@ public class Library {
 		requestID++;
 		System.out.println("init: " + requestID);
 		request.put(requestID, new Object[] { requestID, "init", password, alias, ks });
-		while(response.size() < N/2);
+		while(response.size() < (N_SERVERS + F) / 2);
 		HashMap<Object, Integer> majority = new HashMap<Object, Integer>();
 		for (Object values : response.values()) {
 			if (majority.get(values) == null) {
@@ -64,7 +69,7 @@ public class Library {
 		requestID++;
 		System.out.println("register_user: " + requestID);
 		request.put(requestID, new Object[] { requestID, "register_user" });
-		while (response.size() < N / 2)
+		while (response.size() < (N_SERVERS + F) / 2)
 			;
 	}
 
@@ -72,9 +77,8 @@ public class Library {
 		response = new ConcurrentHashMap<Integer, Object>();
 		requestID++;
 		timestamp = timestamp.add(BigInteger.ONE);
-		System.out.println("ADIONA PUTA " + timestamp);
 		request.put(requestID, new Object[] { requestID, "save_password", domain, username, password, timestamp.toByteArray() });
-		while (response.size() < N / 2)
+		while (response.size() < (N_SERVERS + F) / 2)
 			;
 	}
 
@@ -84,7 +88,7 @@ public class Library {
 		response = new ConcurrentHashMap<Integer, Object>();
 		requestID++;
 		request.put(requestID, new Object[] { requestID, "retrieve_password", domain, username });
-		while (response.size() < N / 2);
+		while (response.size() < (N_SERVERS + F) / 2);
 		HashMap<Object, Integer> majority = new HashMap<Object, Integer>();
 		for (Object values : response.values()) {
 			if (majority.get(values) == null) {

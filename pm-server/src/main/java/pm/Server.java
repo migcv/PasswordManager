@@ -34,6 +34,8 @@ import pm.exception.*;
 public class Server extends UnicastRemoteObject implements ServerService, Serializable {
 
 	private static final long serialVersionUID = 1L;
+	
+	private int port;
 
 	private PublicKey publicKey;
 	private PrivateKey privateKey;
@@ -46,8 +48,11 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 
 	Utils utl = new Utils();
 
-	protected Server() throws RemoteException {
+	protected Server(int port) throws RemoteException {
 		super();
+		
+		this.port = port;
+		
 		// Generate a key pair, public & private key
 		KeyPairGenerator keyGen;
 		try {
@@ -98,7 +103,6 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 			BigInteger timestamp;
 			if (timestampMap.get(publicKey) == null) {
 				timestamp = BigInteger.ZERO;
-				System.out.println("TIMESTAMP: " + timestamp);
 				timestampMap.put(publicKey, timestamp);
 			} else {
 				timestamp = timestampMap.get(publicKey);
@@ -327,7 +331,7 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 		}
 
 		byte[] domainDeciphered = null, usernameDeciphered = null, signatureToSend = null, nounceDeciphered = null,
-				idDeciphered = null;
+				idDeciphered = null, timestampCiphered = null;
 
 		// Decipher content
 		try {
@@ -394,17 +398,23 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 
 					passwordCiphered = cipher.doFinal(tripletList.get(i).getPassword());
 					nounceCiphered = cipher.doFinal(ss.getNounce().toByteArray());
+					
+					timestampCiphered = cipher.doFinal(tripletList.get(i).getTimestamp());
+					
+					byte[] valueSignature = tripletList.get(i).getValueSignature();
 
 					tripletList.get(i).addSignturesArray(signature);
 
 					// Signature contaning [ password, nonce, iv ] signed with
 					// Server's private key
-					signatureToSend = sign(passwordCiphered, nounceCiphered, iv);
+					signatureToSend = sign(passwordCiphered, timestampCiphered, valueSignature, nounceCiphered, iv);
 
 					// Create List to send with [ password_ciphered,
 					// iv,signature,nounce ]
 					ArrayList<byte[]> res = new ArrayList<byte[]>();
 					res.add(passwordCiphered);
+					res.add(timestampCiphered);
+					res.add(valueSignature);
 					res.add(nounceCiphered);
 					res.add(iv);
 					res.add(signatureToSend);
@@ -443,9 +453,9 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 	}
 
 	// Saves the state of the server in file pmserver.ser
-	public void saveState() {
+	public synchronized void saveState() {
 		try {
-			FileOutputStream fileOut = new FileOutputStream("pmserver.ser");
+			FileOutputStream fileOut = new FileOutputStream("pmserver" + port + ".ser");
 			ObjectOutputStream out = new ObjectOutputStream(fileOut);
 			out.writeObject(this);
 			out.close();

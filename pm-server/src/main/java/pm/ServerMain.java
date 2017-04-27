@@ -7,23 +7,25 @@ import java.rmi.registry.*;
 
 public class ServerMain {
 
-	protected static int N = 4;
+	protected static final int F = 2;
 
 	public static void main(String[] args) {
 
 		int registryPort = 10000;
 		System.setSecurityManager(new SecurityManager());
 		ServerService server = null;
+		
+		final int N_SERVERS = F * 3 + 1;
 
-		System.out.println("Launching " + N + " servers!");
+		System.out.println("Launching " + N_SERVERS + " servers!");
 
 		// Load the state of the server
 		server = loadState();
-		for (int i = 0; i < N; i++) {
+		for (int i = 0; i < N_SERVERS; i++) {
 			try {
 				// If the load returned null, create new Server instance
 				if (server == null) {
-					server = new Server();
+					server = new Server(registryPort + i);
 				}
 				// Registry Server
 				Registry reg = LocateRegistry.createRegistry(registryPort + i);
