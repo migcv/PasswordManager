@@ -3,6 +3,7 @@ package pm;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.math.BigInteger;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
@@ -23,6 +24,8 @@ public class Library {
 
 	private ConcurrentHashMap<Integer, Object> response;
 
+	private BigInteger timestamp;
+
 	public Library() {
 		for (int i = 0; i < N; i++) {
 			Thread td = new Thread(new LibraryThread(PORT + i, this), Integer.toString(PORT + i));
@@ -33,12 +36,27 @@ public class Library {
 	}
 
 	public void init(char[] password, String alias, KeyStore ks) {
+		Object res = null;
+		Integer total = 0;
 		response = new ConcurrentHashMap<Integer, Object>();
 		requestID++;
 		System.out.println("init: " + requestID);
 		request.put(requestID, new Object[] { requestID, "init", password, alias, ks });
 		while(response.size() < N/2);
-		System.out.println("Init done!");
+		HashMap<Object, Integer> majority = new HashMap<Object, Integer>();
+		for (Object values : response.values()) {
+			if (majority.get(values) == null) {
+				majority.put(values, 1);
+			} else {
+				majority.put(values, majority.get(values) + 1);
+			}
+			if (majority.get(values) > total) {
+				total = majority.get(values);
+				res = values;
+			}
+		}
+		timestamp = (BigInteger) res;
+		System.out.println("Init done! Timestamp: " + timestamp);
 	}
 
 	public void register_user() {
@@ -46,14 +64,18 @@ public class Library {
 		requestID++;
 		System.out.println("register_user: " + requestID);
 		request.put(requestID, new Object[] { requestID, "register_user" });
-		while(response.size() < N/2);
+		while (response.size() < N / 2)
+			;
 	}
 
 	public void save_password(byte[] domain, byte[] username, byte[] password) {
 		response = new ConcurrentHashMap<Integer, Object>();
 		requestID++;
-		request.put(requestID, new Object[] { requestID, "save_password", domain, username, password });
-		while(response.size() < N/2);
+		timestamp = timestamp.add(BigInteger.ONE);
+		System.out.println("ADIONA PUTA " + timestamp);
+		request.put(requestID, new Object[] { requestID, "save_password", domain, username, password, timestamp.toByteArray() });
+		while (response.size() < N / 2)
+			;
 	}
 
 	public byte[] retrieve_password(byte[] domain, byte[] username) {
@@ -62,21 +84,20 @@ public class Library {
 		response = new ConcurrentHashMap<Integer, Object>();
 		requestID++;
 		request.put(requestID, new Object[] { requestID, "retrieve_password", domain, username });
-		while(response.size() < N/2 && total < N/2) {
-			HashMap<Object, Integer> majority = new HashMap<Object, Integer>();
-			for(Object values : response.values()) {
-				if(majority.get(values) == null) {
-					majority.put(values, 1);
-				} else {
-					majority.put(values, majority.get(values)+1);
-				}
-				if(majority.get(values) > total) {
-					total = majority.get(values);
-					res = values;
-				}
+		while (response.size() < N / 2);
+		HashMap<Object, Integer> majority = new HashMap<Object, Integer>();
+		for (Object values : response.values()) {
+			if (majority.get(values) == null) {
+				majority.put(values, 1);
+			} else {
+				majority.put(values, majority.get(values) + 1);
+			}
+			if (majority.get(values) > total) {
+				total = majority.get(values);
+				res = values;
 			}
 		}
-		return (byte[])res;
+		return (byte[]) res;
 	}
 
 	public void close() {
@@ -86,7 +107,7 @@ public class Library {
 	public Object[] getRequest(int id) {
 		return request.get(id);
 	}
-	
+
 	public int getRequestSize() {
 		return request.size();
 	}
@@ -96,7 +117,7 @@ public class Library {
 	}
 
 	public void addResponse(Integer port, Integer id, Object value) {
-		if(requestID == id) {
+		if (requestID == id) {
 			response.put(port, value);
 		}
 	}
@@ -112,15 +133,16 @@ public class Library {
 			ks.load(fis, password);
 			fis.close();
 		} catch (FileNotFoundException e) {
+			System.out.println("KeyStoreNotFound");
 			return null;
 		} catch (KeyStoreException e) {
-			return null;
+			e.printStackTrace();
 		} catch (NoSuchAlgorithmException e) {
-			return null;
+			e.printStackTrace();
 		} catch (CertificateException e) {
-			return null;
+			e.printStackTrace();
 		} catch (IOException e) {
-			return null;
+			e.printStackTrace();
 		}
 		return ks;
 	}

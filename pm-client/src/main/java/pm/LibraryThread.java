@@ -46,20 +46,20 @@ public class LibraryThread implements Serializable, Runnable {
 	public void run() {
 		while (true) {
 			System.out.println(port + " WAITING REQUEST " + requestID);
-			while(lb.getRequestSize() <= requestID) {
+			while (lb.getRequestSize() <= requestID) {
 				try {
 					Thread.sleep(250);
 				} catch (InterruptedException e) {
 					e.printStackTrace();
 				}
 			}
-			Object[] request = lb.getRequest(requestID+1);
-			System.out.println(port + " REQUEST: " + request[0] +" "+ request[1]);
+			Object[] request = lb.getRequest(requestID + 1);
+			System.out.println(port + " REQUEST: " + request[0] + " " + request[1]);
 			if (request[1].equals("init")) {
 				System.out.println(port + " INIT");
-				init((char[]) request[2], (String) request[3], (KeyStore) request[4]);
+				BigInteger timestamp = init((char[]) request[2], (String) request[3], (KeyStore) request[4]);
 				requestID = ((Integer) request[0]).intValue();
-				lb.addResponse(port, requestID, true);
+				lb.addResponse(port, requestID, timestamp);
 			} else if (request[1].equals("register_user")) {
 				System.out.println(port + " REGISTER_USER");
 				register_user();
@@ -67,7 +67,7 @@ public class LibraryThread implements Serializable, Runnable {
 				lb.addResponse(port, requestID, true);
 			} else if (request[1].equals("save_password")) {
 				System.out.println(port + " SAVE_PASSWORD");
-				save_password((byte[]) request[2], (byte[]) request[3], (byte[]) request[4]);
+				save_password((byte[]) request[2], (byte[]) request[3], (byte[]) request[4], (byte[]) request[5]);
 				requestID = ((Integer) request[0]).intValue();
 				lb.addResponse(port, requestID, true);
 			} else if (request[1].equals("retrieve_password")) {
@@ -76,11 +76,13 @@ public class LibraryThread implements Serializable, Runnable {
 				requestID = ((Integer) request[0]).intValue();
 				lb.addResponse(port, requestID, pw);
 			}
-			
+
 		}
 	}
 
-	public void init(char[] password, String alias, KeyStore ks) {
+	public BigInteger init(char[] password, String alias, KeyStore ks) {
+		
+		BigInteger timestamp = null;
 
 		ck = new KeyManagement();
 
@@ -110,6 +112,7 @@ public class LibraryThread implements Serializable, Runnable {
 			// data sent ==> [ Client_Public_Key, Signature ]
 			ArrayList<byte[]> data = server.init(ck.getPublicK(), ck.signature(ck.getPublicK().getEncoded()));
 			// data received ==> [ Server_Public_Key, Session_Key, userID,
+			// timestamp,
 			// Nonce, IV, Signature ]
 
 			// Server's public key
@@ -117,10 +120,9 @@ public class LibraryThread implements Serializable, Runnable {
 
 			// Verifies Signature verifySignature(SK_pub, signature, SK_pub, Ks,
 			// userID, Nonce, IV)
-			if (!ck.verifySignature(serverKey, data.get(5), data.get(0), data.get(1), data.get(2), data.get(3),
-					data.get(4))) {
-				System.out.println("init: signature wrong!");
-				return;
+			if (!ck.verifySignature(serverKey, data.get(6), data.get(0), data.get(1), data.get(2), data.get(3),
+					data.get(4), data.get(5))) {
+				throw new SignatureWrongException();
 			}
 
 			// Session Key ciphered
@@ -134,23 +136,30 @@ public class LibraryThread implements Serializable, Runnable {
 			sessionKey = new SecretKeySpec(aux, 0, aux.length, "AES");
 
 			// IV
-			byte[] iv = data.get(4);
+			byte[] iv = data.get(5);
 			IvParameterSpec ivspec = new IvParameterSpec(iv);
 
 			// UserID ciphered
 			byte[] userIDCiphered = data.get(2);
 
+			// Timestamp ciphered
+			byte[] timestampCiphered = data.get(3);
+
 			// Nounce ciphered
-			byte[] nounceCiphered = data.get(3);
+			byte[] nounceCiphered = data.get(4);
 
 			// Deciphering of the userID and nounce w/ session_key
 			Cipher simetricCipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
 			simetricCipher.init(Cipher.DECRYPT_MODE, sessionKey, ivspec);
 			byte[] userIDDeciphered = simetricCipher.doFinal(userIDCiphered);
+			byte[] timestampDeciphered = simetricCipher.doFinal(timestampCiphered);
 			byte[] nounceDeciphered = simetricCipher.doFinal(nounceCiphered);
 
 			// Store UserID
 			userID = new BigInteger(userIDDeciphered);
+
+			// Store Timestamp
+			timestamp = new BigInteger(timestampDeciphered);
 
 			// Store given nonce
 			nounce = new BigInteger(nounceDeciphered);
@@ -174,6 +183,8 @@ public class LibraryThread implements Serializable, Runnable {
 		} catch (SignatureException e) {
 			e.printStackTrace();
 		}
+		
+		return timestamp;
 	}
 
 	public void register_user() {
@@ -227,10 +238,10 @@ public class LibraryThread implements Serializable, Runnable {
 
 	}
 
-	public void save_password(byte[] domain, byte[] username, byte[] password) {
+	public void save_password(byte[] domain, byte[] username, byte[] password, byte[] timestamp) {
 
 		byte[] userIDCiphered = null, passCiphered = null, domainCiphered = null, usernameCiphered = null,
-				nounceCiphered = null;
+				timestampCiphered = null, nounceCiphered = null;
 
 		nounce = nounce.shiftLeft(2);
 
@@ -256,6 +267,10 @@ public class LibraryThread implements Serializable, Runnable {
 			byte[] domainHash = ck.digest(domain);
 			byte[] usernameHash = ck.digest(username);
 
+			// Signature of value [ H(domain), H(username), E(password),
+			// timestamp ]
+			byte[] valueSignature = ck.signature(domainHash, usernameHash, passCiphered, timestamp);
+
 			// Cipher domain, username, password & nounce with session key
 			Cipher simetricCipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
 			simetricCipher.init(Cipher.ENCRYPT_MODE, sessionKey, ivspec);
@@ -263,16 +278,17 @@ public class LibraryThread implements Serializable, Runnable {
 			passCiphered = simetricCipher.doFinal(passCiphered);
 			domainCiphered = simetricCipher.doFinal(domainHash);
 			usernameCiphered = simetricCipher.doFinal(usernameHash);
+			timestampCiphered = simetricCipher.doFinal(timestamp);
 			nounceCiphered = simetricCipher.doFinal(nounce.toByteArray());
 
-			// Signature of all data [ E(H(domain)), E(H(username)),
+			// Signature of all data [ E(userID), E(H(domain)), E(H(username)),
 			// E(E(password)) & IV ]
 			byte[] signature = ck.signature(userIDCiphered, domainCiphered, usernameCiphered, passCiphered, iv);
 
 			// Data sending ==> [ CKpub, User_ID, E(H(domain)), E(H(username)),
 			// E(E(password)), IV, signature ]
-			server.put(ck.getPublicK(), userIDCiphered, domainCiphered, usernameCiphered, passCiphered, iv,
-					nounceCiphered, signature);
+			server.put(ck.getPublicK(), userIDCiphered, domainCiphered, usernameCiphered, passCiphered,
+					timestampCiphered, valueSignature, iv, nounceCiphered, signature);
 
 		} catch (RemoteException e) {
 			e.printStackTrace();

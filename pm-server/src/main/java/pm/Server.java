@@ -42,6 +42,8 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 
 	private Map<BigInteger, Session> sessionKeyMap = new HashMap<BigInteger, Session>();
 
+	private Map<Key, BigInteger> timestampMap = new HashMap<Key, BigInteger>();
+
 	Utils utl = new Utils();
 
 	protected Server() throws RemoteException {
@@ -76,7 +78,8 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 		Session ss = new Session(publicKey, sessionKey, nounce);
 		sessionKeyMap.put(id, ss);
 		Cipher cipher;
-		byte[] sessionKeyCiphered = null, signature = null, nounceCiphered = null, iv = null, idCiphered = null;
+		byte[] sessionKeyCiphered = null, signature = null, nounceCiphered = null, timestampCiphered = null, iv = null,
+				idCiphered = null;
 		ArrayList<byte[]> res = new ArrayList<byte[]>();
 
 		try {
@@ -91,20 +94,34 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 			random.nextBytes(iv);
 			IvParameterSpec ivspec = new IvParameterSpec(iv);
 
+			// Sends the most recent timestamp
+			BigInteger timestamp;
+			if (timestampMap.get(publicKey) == null) {
+				timestamp = BigInteger.ZERO;
+				System.out.println("TIMESTAMP: " + timestamp);
+				timestampMap.put(publicKey, timestamp);
+			} else {
+				timestamp = timestampMap.get(publicKey);
+			}
+			byte[] timestampBytes = timestamp.toByteArray();
+
 			// Cipher the nounce and the id with the Session Key
 			cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
 			cipher.init(Cipher.ENCRYPT_MODE, ss.getSessionKey(), ivspec);
 			nounceCiphered = cipher.doFinal(nounce.toByteArray());
+			timestampCiphered = cipher.doFinal(timestampBytes);
 			idCiphered = cipher.doFinal(id.toByteArray());
 
 			// Signature contaning [ Public Key, Session Key, Nonce, id, IV ]
 			// signed with Server's private key
-			signature = sign(this.publicKey.getEncoded(), sessionKeyCiphered, idCiphered, nounceCiphered, iv);
+			signature = sign(this.publicKey.getEncoded(), sessionKeyCiphered, idCiphered, timestampCiphered,
+					nounceCiphered, iv);
 
 			// Create the array to send to the client
 			res.add(this.publicKey.getEncoded());
 			res.add(sessionKeyCiphered);
 			res.add(idCiphered);
+			res.add(timestampCiphered);
 			res.add(nounceCiphered);
 			res.add(iv);
 			res.add(signature);
@@ -163,7 +180,7 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 			ss.setNounce(bg);
 
 			publicKeyMap.put(publicKey, new ArrayList<Triplet>());
-			
+
 			Thread.sleep(5000);
 
 		} catch (InvalidKeyException e) {
@@ -185,8 +202,9 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 
 	}
 
-	public void put(Key publicKey, byte[] id, byte[] domain, byte[] username, byte[] password, byte[] iv, byte[] n,
-			byte[] signature) throws RemoteException, PublicKeyDoesntExistException, SignatureWrongException {
+	public void put(Key publicKey, byte[] id, byte[] domain, byte[] username, byte[] password, byte[] timestamp,
+			byte[] valueSignature, byte[] iv, byte[] n, byte[] signature)
+			throws RemoteException, PublicKeyDoesntExistException, SignatureWrongException {
 
 		// Verify Signature
 		if (!utl.verifySignature(publicKey, signature, id, domain, username, password, iv)) {
@@ -194,7 +212,7 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 		}
 
 		byte[] domainDeciphered = null, usernameDeciphered = null, passwordDeciphered = null, nounceDeciphered = null,
-				idDeciphered = null;
+				idDeciphered = null, timestampDeciphered = null;
 
 		// Decipher content
 		try {
@@ -216,6 +234,7 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 			usernameDeciphered = decipher.doFinal(username);
 			passwordDeciphered = decipher.doFinal(password);
 			nounceDeciphered = decipher.doFinal(n);
+			timestampDeciphered = decipher.doFinal(timestamp);
 
 			BigInteger bg = new BigInteger(nounceDeciphered);
 
@@ -246,6 +265,12 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 		if (tripletList == null) {
 			throw new PublicKeyDoesntExistException();
 		}
+		
+		BigInteger wtimestamp = new BigInteger(timestampDeciphered); 
+		
+		if(wtimestamp.compareTo(timestampMap.get(publicKey)) <= 0) {
+			throw new InvalidTimestampException();
+		}
 
 		for (int i = 0; i < tripletList.size(); i++) {
 			// Verifies if the domain & username exists, if true, replace
@@ -262,9 +287,12 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 				tripletList.get(i).setDomain(utl.diggestSalt(domainDeciphered, salt));
 				tripletList.get(i).setUsername(utl.diggestSalt(usernameDeciphered, salt));
 				tripletList.get(i).setSalt(salt);
-
+				tripletList.get(i).setValueSignature(valueSignature);
+				tripletList.get(i).setTimestamp(timestampDeciphered);
 				tripletList.get(i).setPassword(passwordDeciphered);
-
+				
+				timestampMap.put(publicKey, wtimestamp);
+				
 				exists = true;
 				break;
 			}
@@ -279,7 +307,10 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 			domainDeciphered = utl.diggestSalt(domainDeciphered, salt);
 			usernameDeciphered = utl.diggestSalt(usernameDeciphered, salt);
 
-			tripletList.add(new Triplet(domainDeciphered, usernameDeciphered, passwordDeciphered, salt, signature));
+			tripletList.add(new Triplet(domainDeciphered, usernameDeciphered, passwordDeciphered, salt, timestampDeciphered,
+					valueSignature, signature));
+			
+			timestampMap.put(publicKey, wtimestamp);
 		}
 		// Put back the list of triplet in the map
 		publicKeyMap.put(publicKey, tripletList);
@@ -419,7 +450,6 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 			out.writeObject(this);
 			out.close();
 			fileOut.close();
-			System.out.println("Serialized data is saved in pmserver.ser");
 		} catch (IOException i) {
 			i.printStackTrace();
 		}
