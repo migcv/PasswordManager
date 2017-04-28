@@ -14,7 +14,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class Library {
 
-	protected static final int F = 2;
+	protected static final int F = 1;
 	
 	protected static int N_SERVERS;
 	

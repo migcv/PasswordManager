@@ -101,6 +101,9 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 
 			// Sends the most recent timestamp
 			BigInteger timestamp;
+			if(timestampMap == null) {
+				timestampMap = new HashMap<Key, BigInteger>();
+			}
 			if (timestampMap.get(publicKey) == null) {
 				timestamp = BigInteger.ZERO;
 				timestampMap.put(publicKey, timestamp);

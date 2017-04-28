@@ -48,9 +48,7 @@ public class LibraryThread implements Serializable, Runnable {
 			while (lb.getRequestSize() <= requestID) {
 				try {
 					Thread.sleep(250);
-				} catch (InterruptedException e) {
-					e.printStackTrace();
-				}
+				} catch (InterruptedException e) {}
 			}
 			Object[] request = lb.getRequest(requestID + 1);
 			System.out.println(port + " REQUEST: " + request[0] + " " + request[1]);
@@ -160,6 +158,8 @@ public class LibraryThread implements Serializable, Runnable {
 			nounce = new BigInteger(nounceDeciphered);
 
 		} catch (RemoteException e) {
+			Thread.currentThread().interrupt();
+			System.out.println("ERROR: Connection ERROR > TERMINATING THREAD " + port);
 			e.printStackTrace();
 		} catch (InvalidKeyException e) {
 			e.printStackTrace();
@@ -228,7 +228,9 @@ public class LibraryThread implements Serializable, Runnable {
 		} catch (SignatureException e) {
 			e.printStackTrace();
 		} catch (RemoteException e) {
-			e.printStackTrace();
+			Thread.currentThread().interrupt();
+			System.out.println("ERROR: Connection ERROR > TERMINATING THREAD " + port);
+			//e.printStackTrace();
 		}
 
 	}
@@ -286,7 +288,9 @@ public class LibraryThread implements Serializable, Runnable {
 					timestampCiphered, valueSignature, iv, nounceCiphered, signature);
 
 		} catch (RemoteException e) {
-			e.printStackTrace();
+			Thread.currentThread().interrupt();
+			System.out.println("ERROR: Connection ERROR > TERMINATING THREAD " + port);
+			//e.printStackTrace();
 		} catch (InvalidKeyException e) {
 			e.printStackTrace();
 		} catch (IllegalBlockSizeException e) {
@@ -403,7 +407,9 @@ public class LibraryThread implements Serializable, Runnable {
 			nounce = nounce.shiftLeft(2);
 
 		} catch (RemoteException e) {
-			e.printStackTrace();
+			Thread.currentThread().interrupt();
+			System.out.println("ERROR: Connection ERROR > TERMINATING THREAD " + port);
+			//e.printStackTrace();
 		} catch (IllegalBlockSizeException e) {
 			e.printStackTrace();
 		} catch (BadPaddingException e) {
