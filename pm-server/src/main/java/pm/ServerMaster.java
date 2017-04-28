@@ -19,7 +19,8 @@ public class ServerMaster {
 					p = Runtime.getRuntime().exec("cmd /c start cmd.exe /k java -cp target/classes pm.ServerMain " + (PORT + i));
 					p.waitFor();
 				} else { // Run in Mac
-					Runtime.getRuntime().exec("/usr/bin/open -a Terminal ./target/appassembler/bin/pm-server");
+					p = Runtime.getRuntime().exec("");
+					p.waitFor();
 				}
 			}
 		} catch (IOException e1) {
