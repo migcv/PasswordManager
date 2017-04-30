@@ -146,15 +146,4 @@ public class PMTest {
 
 	}
 
-	@Test(expected = NullPointerException.class)
-	public void NoInit() {
-
-		Library c = new Library();
-
-		c.register_user();
-		c.save_password("www.google.com".getBytes(), "Miguel".getBytes(), "Viegas".getBytes());
-		c.retrieve_password("www.google.com".getBytes(), "Miguel".getBytes());
-		c.close();
-	}
-
 }
