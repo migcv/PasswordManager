@@ -17,6 +17,7 @@ import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
 import pm.exception.InvalidNounceException;
+import pm.exception.InvalidTimestampException;
 import pm.exception.SignatureWrongException;
 
 public class LibraryThread implements Serializable, Runnable {
@@ -69,7 +70,6 @@ public class LibraryThread implements Serializable, Runnable {
 				requestID = ((Integer) request[0]).intValue();
 				lb.addResponse(port, requestID, res);
 			}
-
 		}
 	}
 
@@ -305,6 +305,8 @@ public class LibraryThread implements Serializable, Runnable {
 			e.printStackTrace();
 		} catch (InvalidAlgorithmParameterException e) {
 			e.printStackTrace();
+		} catch (InvalidTimestampException e) {
+			
 		}
 	}
 

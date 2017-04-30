@@ -9,12 +9,8 @@ import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateException;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.concurrent.ConcurrentHashMap;
-
-import pm.exception.InconcistencyException;
 
 public class Library {
 
@@ -82,49 +78,33 @@ public class Library {
 		requestID++;
 		timestamp = timestamp.add(BigInteger.ONE);
 		request.put(requestID, new Object[] { requestID, "save_password", domain, username, password, timestamp.toByteArray() });
-		while (response.size() < (N_SERVERS + F) / 2)
-			;
+		while (response.size() < (N_SERVERS + F) / 2);
 	}
 
 	public byte[] retrieve_password(byte[] domain, byte[] username) {
-		BigInteger res = null;
-		Integer total = 0;
+		byte[][] pw_ts = null;
 		BigInteger max_ts = BigInteger.ZERO;
+		
 		response = new ConcurrentHashMap<Integer, Object>();
 		requestID++;
+		
 		request.put(requestID, new Object[] { requestID, "retrieve_password", domain, username });
+			
 		while (response.size() < (N_SERVERS + F) / 2);
-		HashMap<Object, Integer> majority = new HashMap<Object, Integer>();
+		
 		for (Object values : response.values()) {
 			BigInteger ts = new BigInteger(((byte[][]) values)[1]);
-			if (majority.get(ts) == null) {
-				majority.put(ts, 1);
-			} else {
-				majority.put(ts, majority.get(ts) + 1);
-			}
-			if (majority.get(ts) > total) {
-				total = majority.get(ts);
-				max_ts = ts;
-				res = ts;
-			} else if(majority.get(ts) == total && max_ts.compareTo(ts) < 0) {
-				total = majority.get(ts);
-				max_ts = ts;
-				res = ts;
+			if (max_ts.compareTo(ts) < 0) {
+				pw_ts = (byte[][]) values;
 			}
 		}
-		ArrayList<byte[]> pwList = new ArrayList<byte[]>();
-		for (Object values : response.values()) {
-			BigInteger ts = new BigInteger(((byte[][]) values)[1]);
-			if(ts.compareTo(res) == 0) {
-				pwList.add(((byte[][]) values)[0]);
-			}
-		}
-		for (int i = 1; i < pwList.size(); i++) {
-			if(!Arrays.equals(pwList.get(0), pwList.get(i))) {
-				throw new InconcistencyException();
-			}
-		}
-		return pwList.get(0);
+	
+		response = new ConcurrentHashMap<Integer, Object>();
+		requestID++;
+		request.put(requestID, new Object[] { requestID, "save_password", domain, username, pw_ts[0], pw_ts[1] });
+		while (response.size() < (N_SERVERS + F) / 2);
+		
+		return pw_ts[0];
 	}
 
 	public void close() {

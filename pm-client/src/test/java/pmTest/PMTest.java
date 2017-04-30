@@ -14,8 +14,6 @@ import org.junit.Test;
 
 import pm.Library;
 import pm.ServerService;
-import pm.exception.DomainOrUsernameDoesntExistException;
-import pm.exception.PublicKeyDoesntExistException;
 
 public class PMTest {
 
@@ -97,53 +95,33 @@ public class PMTest {
 
 		assertFalse(c == c1);
 	}
-
-	@Test(expected = DomainOrUsernameDoesntExistException.class)
-	public void UsernameDoesNotExists() {
+	
+	@Test
+	public void sucessTwoLibrarysAgain() throws UnsupportedEncodingException {
 
 		Library c = new Library();
+		Library c1 = new Library();
+		
 		c.init("password".toCharArray(), "alias", null);
+		c1.init("password1".toCharArray(), "alias1", null);
+		
 		c.register_user();
 		c.save_password("www.google.com".getBytes(), "Alice".getBytes(), "SEC_16_17".getBytes());
-		c.retrieve_password("www.google.com".getBytes(), "Alice".getBytes());
-		c.retrieve_password("www.google.com".getBytes(), "Macaco".getBytes());
+		
+		c1.register_user();
+		c1.save_password("www.google.com".getBytes(), "Bob".getBytes(), "SEC".getBytes());
+		String pass1 = new String(c1.retrieve_password("www.google.com".getBytes(), "Bob".getBytes()), "UTF-8");
+		
+		String pass2 = new String(c.retrieve_password("www.google.com".getBytes(), "Alice".getBytes()), "UTF-8");		
 		c.close();
 
+		c1.save_password("www.pornhub.com".getBytes(), "Maria".getBytes(), "PALHOLHO".getBytes());
+		String pass3 = new String(c1.retrieve_password("www.pornhub.com".getBytes(), "Maria".getBytes()), "UTF-8");
+		c1.close();
+
+		assertFalse(pass1 == pass2);
+		assertFalse(pass2 == pass3);
+		assertFalse(pass1 == pass3);
 	}
-
-	@Test(expected = DomainOrUsernameDoesntExistException.class)
-	public void DomainDoesNotExists() {
-
-		Library c = new Library();
-		c.init("password".toCharArray(), "alias", null);
-		c.register_user();
-		c.save_password("www.google.com".getBytes(), "Alice".getBytes(), "SEC_16_17".getBytes());
-		c.retrieve_password("www.google.com".getBytes(), "Alice".getBytes());
-		c.retrieve_password("www.ist.com".getBytes(), "Alice".getBytes());
-		c.close();
-
-	}
-
-	@Test(expected = DomainOrUsernameDoesntExistException.class)
-	public void UserDoesNotExists() {
-
-		Library c = new Library();
-		c.init("password".toCharArray(), "alias", null);
-		c.register_user();
-		c.retrieve_password("www.ist.com".getBytes(), "Alice".getBytes());
-		c.close();
-
-	}
-
-	@Test(expected = PublicKeyDoesntExistException.class)
-	public void DoesNotRegist() {
-
-		Library c = new Library();
-		c.init("password".toCharArray(), "alias", null);
-		c.save_password("www.google.com".getBytes(), "Alice".getBytes(), "SEC_16_17".getBytes());
-		c.retrieve_password("www.google.com".getBytes(), "Alice".getBytes());
-		c.close();
-
-	}
-
+	
 }

@@ -70,9 +70,12 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 	}
 
 	public ArrayList<byte[]> init(Key publicKey, byte[] sig) throws RemoteException {
+		
+		System.out.println(this.port + " > Received Request <Init>");
 
 		// Verify Signature
 		if (!utl.verifySignature(publicKey, sig, publicKey.getEncoded())) {
+			System.out.println(port + " > Signature NOT valid!");
 			throw new SignatureWrongException();
 		}
 
@@ -154,8 +157,11 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 
 	public void register(Key publicKey, byte[] id, byte[] nonce, byte[] iv, byte[] signature) throws RemoteException {
 
+		System.out.println(port + " > Received Request <Register>");
+		
 		// Verify Signature
 		if (!utl.verifySignature(publicKey, signature, publicKey.getEncoded(), id, nonce, iv)) {
+			System.out.println(port + " > Signature NOT valid!");
 			throw new SignatureWrongException();
 		}
 
@@ -181,6 +187,7 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 			BigInteger bg = new BigInteger(nounceDecipher);
 
 			if (!bg.equals(ss.getNounce().shiftLeft(2))) {
+				System.out.println(port + " > Nonce NOT valid!");
 				throw new InvalidNounceException();
 			}
 
@@ -212,9 +219,12 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 	public void put(Key publicKey, byte[] id, byte[] domain, byte[] username, byte[] password, byte[] timestamp,
 			byte[] valueSignature, byte[] iv, byte[] n, byte[] signature)
 			throws RemoteException, PublicKeyDoesntExistException, SignatureWrongException {
+		
+		System.out.println(port + " > Received Resquest <Put>");
 
 		// Verify Signature
 		if (!utl.verifySignature(publicKey, signature, id, domain, username, password, iv)) {
+			System.out.println(port + " > Signature NOT valid!");
 			throw new SignatureWrongException();
 		}
 
@@ -246,6 +256,7 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 			BigInteger bg = new BigInteger(nounceDeciphered);
 
 			if (!bg.equals(ss.getNounce().shiftLeft(2))) {
+				System.out.println(port + " > Nonce NOT valid!");
 				throw new InvalidNounceException();
 			}
 
@@ -270,12 +281,14 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 
 		// Verifies if the publicKey exists
 		if (tripletList == null) {
+			System.out.println(port + " > Public Key does't exists!");
 			throw new PublicKeyDoesntExistException();
 		}
 		
 		BigInteger wtimestamp = new BigInteger(timestampDeciphered); 
 		
 		if(wtimestamp.compareTo(timestampMap.get(publicKey)) <= 0) {
+			System.out.println(port + " > Timestamp NOT valid!");
 			throw new InvalidTimestampException();
 		}
 
@@ -328,8 +341,12 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 	public ArrayList<byte[]> get(Key publicKey, byte[] id, byte[] domain, byte[] username, byte[] iv, byte[] n,
 			byte[] signature) throws RemoteException, PublicKeyDoesntExistException,
 			DomainOrUsernameDoesntExistException, SignatureWrongException {
+		
+		System.out.println(port + " > Request Received <Get>");
+		
 		// Verify Signature
 		if (!utl.verifySignature(publicKey, signature, publicKey.getEncoded(), id, domain, username, n, iv)) {
+			System.out.println(port + " > Signature NOT valid!");
 			throw new SignatureWrongException();
 		}
 
@@ -359,6 +376,7 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 			BigInteger bg = new BigInteger(nounceDeciphered);
 
 			if (!bg.equals(ss.getNounce().shiftLeft(2))) {
+				System.out.println(port + " > Nonce NOT valid!");
 				throw new InvalidNounceException();
 			}
 
@@ -370,6 +388,7 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 
 			// Verifies if the publicKey exists
 			if (tripletList == null) {
+				System.out.println(port + " > Public Key doesn't exists!");
 				throw new PublicKeyDoesntExistException();
 			}
 
@@ -439,7 +458,7 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 		} catch (SignatureException e) {
 			e.printStackTrace();
 		}
-
+		System.out.println(port + " > Domain and/or Username doesn't exists!");
 		throw new DomainOrUsernameDoesntExistException();
 	}
 
