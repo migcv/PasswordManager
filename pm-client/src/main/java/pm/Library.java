@@ -9,8 +9,12 @@ import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.concurrent.ConcurrentHashMap;
+
+import pm.exception.InconcistencyException;
 
 public class Library {
 
@@ -83,25 +87,44 @@ public class Library {
 	}
 
 	public byte[] retrieve_password(byte[] domain, byte[] username) {
-		Object res = null;
+		BigInteger res = null;
 		Integer total = 0;
+		BigInteger max_ts = BigInteger.ZERO;
 		response = new ConcurrentHashMap<Integer, Object>();
 		requestID++;
 		request.put(requestID, new Object[] { requestID, "retrieve_password", domain, username });
 		while (response.size() < (N_SERVERS + F) / 2);
 		HashMap<Object, Integer> majority = new HashMap<Object, Integer>();
 		for (Object values : response.values()) {
-			if (majority.get(values) == null) {
-				majority.put(values, 1);
+			BigInteger ts = new BigInteger(((byte[][]) values)[1]);
+			if (majority.get(ts) == null) {
+				majority.put(ts, 1);
 			} else {
-				majority.put(values, majority.get(values) + 1);
+				majority.put(ts, majority.get(ts) + 1);
 			}
-			if (majority.get(values) > total) {
-				total = majority.get(values);
-				res = values;
+			if (majority.get(ts) > total) {
+				total = majority.get(ts);
+				max_ts = ts;
+				res = ts;
+			} else if(majority.get(ts) == total && max_ts.compareTo(ts) < 0) {
+				total = majority.get(ts);
+				max_ts = ts;
+				res = ts;
 			}
 		}
-		return (byte[]) res;
+		ArrayList<byte[]> pwList = new ArrayList<byte[]>();
+		for (Object values : response.values()) {
+			BigInteger ts = new BigInteger(((byte[][]) values)[1]);
+			if(ts.compareTo(res) == 0) {
+				pwList.add(((byte[][]) values)[0]);
+			}
+		}
+		for (int i = 1; i < pwList.size(); i++) {
+			if(!Arrays.equals(pwList.get(0), pwList.get(i))) {
+				throw new InconcistencyException();
+			}
+		}
+		return pwList.get(0);
 	}
 
 	public void close() {

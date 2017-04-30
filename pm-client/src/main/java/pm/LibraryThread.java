@@ -65,9 +65,9 @@ public class LibraryThread implements Serializable, Runnable {
 				requestID = ((Integer) request[0]).intValue();
 				lb.addResponse(port, requestID, true);
 			} else if (request[1].equals("retrieve_password")) {
-				byte[] pw = retrieve_password((byte[]) request[2], (byte[]) request[3]);
+				byte[][] res = retrieve_password((byte[]) request[2], (byte[]) request[3]);
 				requestID = ((Integer) request[0]).intValue();
-				lb.addResponse(port, requestID, pw);
+				lb.addResponse(port, requestID, res);
 			}
 
 		}
@@ -308,10 +308,10 @@ public class LibraryThread implements Serializable, Runnable {
 		}
 	}
 
-	public byte[] retrieve_password(byte[] domain, byte[] username) {
+	public byte[][] retrieve_password(byte[] domain, byte[] username) {
 
 		byte[] password = null, password_aux = null, userIDCiphered = null, domainEncryp = null, usernameEncryp = null,
-				nounceEncryp = null, timestampDecipher = null, valueSignatureDecipher = null;
+				nounceEncryp = null, timestampDecipher = null;
 		ArrayList<byte[]> data = new ArrayList<byte[]>();
 
 		nounce = nounce.shiftLeft(2);
@@ -426,7 +426,7 @@ public class LibraryThread implements Serializable, Runnable {
 			e.printStackTrace();
 		}
 
-		return password;
+		return new byte[][] {password, timestampDecipher};
 	}
 
 	public void close() {
