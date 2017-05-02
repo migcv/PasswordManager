@@ -338,27 +338,27 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 		saveState();
 	}
 
-	public ArrayList<byte[]> get(Key publicKey, byte[] id, byte[] domain, byte[] username, byte[] iv, byte[] n,
+	public ArrayList<byte[]> get(Key publicKey, byte[] user_id, byte[] read_id, byte[] domain, byte[] username, byte[] iv, byte[] n,
 			byte[] signature) throws RemoteException, PublicKeyDoesntExistException,
 			DomainOrUsernameDoesntExistException, SignatureWrongException {
 		
 		System.out.println(port + " > Request Received <Get>");
 		
 		// Verify Signature
-		if (!utl.verifySignature(publicKey, signature, publicKey.getEncoded(), id, domain, username, n, iv)) {
+		if (!utl.verifySignature(publicKey, signature, publicKey.getEncoded(), user_id, read_id, domain, username, n, iv)) {
 			System.out.println(port + " > Signature NOT valid!");
 			throw new SignatureWrongException();
 		}
 
 		byte[] domainDeciphered = null, usernameDeciphered = null, signatureToSend = null, nounceDeciphered = null,
-				idDeciphered = null, timestampCiphered = null;
+				idDeciphered = null, readIDDeciphered = null, timestampCiphered = null, readIDCiphered = null;
 
 		// Decipher content
 		try {
 			// Decipher ID with Server's private key
 			Cipher decipherID = Cipher.getInstance("RSA/ECB/PKCS1Padding");
 			decipherID.init(Cipher.DECRYPT_MODE, this.privateKey);
-			idDeciphered = decipherID.doFinal(id);
+			idDeciphered = decipherID.doFinal(user_id);
 
 			BigInteger userID = new BigInteger(idDeciphered);
 
@@ -372,6 +372,7 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 			domainDeciphered = decipher.doFinal(domain);
 			usernameDeciphered = decipher.doFinal(username);
 			nounceDeciphered = decipher.doFinal(n);
+			readIDDeciphered = decipher.doFinal(read_id);
 
 			BigInteger bg = new BigInteger(nounceDeciphered);
 
@@ -391,7 +392,7 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 				System.out.println(port + " > Public Key doesn't exists!");
 				throw new PublicKeyDoesntExistException();
 			}
-
+			
 			for (int i = 0; i < tripletList.size(); i++) {
 				// Verifies if the domain & username exists, if true, sends
 				// password
@@ -420,6 +421,7 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 
 					passwordCiphered = cipher.doFinal(tripletList.get(i).getPassword());
 					nounceCiphered = cipher.doFinal(ss.getNounce().toByteArray());
+					readIDCiphered = cipher.doFinal(readIDDeciphered);
 					
 					timestampCiphered = cipher.doFinal(tripletList.get(i).getTimestamp());
 					
@@ -429,7 +431,7 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 
 					// Signature contaning [ password, nonce, iv ] signed with
 					// Server's private key
-					signatureToSend = sign(passwordCiphered, timestampCiphered, valueSignature, nounceCiphered, iv);
+					signatureToSend = sign(passwordCiphered, timestampCiphered, valueSignature, readIDCiphered, nounceCiphered, iv);
 
 					// Create List to send with [ password_ciphered,
 					// iv,signature,nounce ]
@@ -437,6 +439,7 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 					res.add(passwordCiphered);
 					res.add(timestampCiphered);
 					res.add(valueSignature);
+					res.add(readIDCiphered);
 					res.add(nounceCiphered);
 					res.add(iv);
 					res.add(signatureToSend);

@@ -16,6 +16,7 @@ import javax.crypto.SecretKey;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
+import pm.exception.InconcistencyException;
 import pm.exception.InvalidNounceException;
 import pm.exception.InvalidTimestampException;
 import pm.exception.SignatureWrongException;
@@ -32,12 +33,16 @@ public class LibraryThread implements Serializable, Runnable {
 	private SecretKey sessionKey = null;
 
 	private BigInteger userID = null;
+	
 	private BigInteger nounce = null;
+
+	private BigInteger readID = BigInteger.ZERO;
 
 	private int port;
 	private Library lb;
 
 	private int requestID = 0;
+	
 
 	public LibraryThread(int port, Library lb) {
 		this.port = port;
@@ -313,10 +318,12 @@ public class LibraryThread implements Serializable, Runnable {
 	public byte[][] retrieve_password(byte[] domain, byte[] username) {
 
 		byte[] password = null, password_aux = null, userIDCiphered = null, domainEncryp = null, usernameEncryp = null,
-				nounceEncryp = null, timestampDecipher = null;
+				nounceEncryp = null, readIDEncryp = null, timestampDecipher = null, readIDDeciphered = null, nounceDeciphered = null;
 		ArrayList<byte[]> data = new ArrayList<byte[]>();
 
 		nounce = nounce.shiftLeft(2);
+		
+		readID = readID.add(BigInteger.ONE);
 
 		try {
 			// Cipher UserID & Password with Public Key
@@ -342,21 +349,21 @@ public class LibraryThread implements Serializable, Runnable {
 			domainEncryp = simetricCipher.doFinal(domainHash);
 			usernameEncryp = simetricCipher.doFinal(usernameHash);
 			nounceEncryp = simetricCipher.doFinal(nounce.toByteArray());
+			readIDEncryp = simetricCipher.doFinal(readID.toByteArray());
 
 			// Signature of all data Public_Key, E(H(domain)), E(H(username)),
 			// E(Nonce) & IV
-			byte[] signature = ck.signature(ck.getPublicK().getEncoded(), userIDCiphered, domainEncryp, usernameEncryp,
+			byte[] signature = ck.signature(ck.getPublicK().getEncoded(), userIDCiphered, readIDEncryp, domainEncryp, usernameEncryp,
 					nounceEncryp, iv);
 
-			// Data sending ==> [ CKpub, E(H(domain)), E(H(username)), IV,
-			// nounce, signature ]
-			data = server.get(ck.getPublicK(), userIDCiphered, domainEncryp, usernameEncryp, iv, nounceEncryp,
+			// Data sending ==> [ CKpub, E(user_id), E(read_id), E(H(domain)), E(H(username)), IV, E(nounce), signature ]
+			data = server.get(ck.getPublicK(), userIDCiphered, readIDEncryp, domainEncryp, usernameEncryp, iv, nounceEncryp,
 					signature);
-			// Data received ==> [ password, timestamp, valueSignature, nounce, iv, signature ]
+			// Data received ==> [ password, timestamp, valueSignature, read_id, nounce, iv, signature ]
 
 			// Verifies Signature - verifySignature(public_key, signature,
 			// password, nonce, iv)
-			if (!ck.verifySignature(serverKey, data.get(5), data.get(0), data.get(1), data.get(2), data.get(3), data.get(4))) {
+			if (!ck.verifySignature(serverKey, data.get(6), data.get(0), data.get(1), data.get(2), data.get(3), data.get(4), data.get(5))) {
 				throw new SignatureWrongException();
 			}
 
@@ -366,13 +373,15 @@ public class LibraryThread implements Serializable, Runnable {
 			byte[] timestampCipher = data.get(1);
 			
 			byte[] valueSignature = data.get(2);
-			iv = data.get(4);
+			
+			byte[] readIDCipher = data.get(3);
+			
+			iv = data.get(5);
 
 			ivspec = new IvParameterSpec(iv);
 
 			// Extracting nounce
-			nounceEncryp = data.get(3);
-			byte[] nounceDeciphered = null;
+			nounceEncryp = data.get(4);
 
 			// Decipher password with Session Key
 
@@ -387,7 +396,14 @@ public class LibraryThread implements Serializable, Runnable {
 
 			password_aux = simetricDecipher.doFinal(passwordCipher);
 			timestampDecipher = simetricDecipher.doFinal(timestampCipher);
+			readIDDeciphered = simetricDecipher.doFinal(readIDCipher);
 			nounceDeciphered = simetricDecipher.doFinal(nounceEncryp);
+			
+			BigInteger rid = new BigInteger(readIDDeciphered);
+			
+			if(readID.compareTo(rid) != 0) {
+				throw new InconcistencyException();
+			}
 			
 			if (!ck.verifySignature(ck.getPublicK(), valueSignature, domainHash, usernameHash, password_aux, timestampDecipher)) {
 				throw new SignatureWrongException();

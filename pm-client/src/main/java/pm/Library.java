@@ -9,8 +9,11 @@ import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.concurrent.ConcurrentHashMap;
+
+import pm.exception.InconcistencyException;
 
 public class Library {
 
@@ -83,6 +86,7 @@ public class Library {
 
 	public byte[] retrieve_password(byte[] domain, byte[] username) {
 		byte[][] pw_ts = null;
+		int total = 0;
 		BigInteger max_ts = BigInteger.ZERO;
 		
 		response = new ConcurrentHashMap<Integer, Object>();
@@ -92,10 +96,34 @@ public class Library {
 			
 		while (response.size() < (N_SERVERS + F) / 2);
 		
+		HashMap<Object, Integer> majority = new HashMap<Object, Integer>();
 		for (Object values : response.values()) {
 			BigInteger ts = new BigInteger(((byte[][]) values)[1]);
-			if (max_ts.compareTo(ts) < 0) {
+			if (majority.get(ts) == null) {
+				majority.put(ts, 1);
+			} else {
+				majority.put(ts, majority.get(ts) + 1);
+			}
+			if (majority.get(ts) > total) {
+				total = majority.get(ts);
+				max_ts = ts;
 				pw_ts = (byte[][]) values;
+			} else if(majority.get(ts) == total && max_ts.compareTo(ts) < 0) {
+				total = majority.get(ts);
+				max_ts = ts;
+				pw_ts = (byte[][]) values;
+			}
+		}
+		ArrayList<byte[]> pwList = new ArrayList<byte[]>();
+		for (Object values : response.values()) {
+			BigInteger ts = new BigInteger(((byte[][]) values)[1]);
+			if(ts.compareTo(max_ts) == 0) {
+				pwList.add(((byte[][]) values)[0]);
+			}
+		}
+		for (int i = 1; i < pwList.size(); i++) {
+			if(!Arrays.equals(pwList.get(0), pwList.get(i))) {
+				throw new InconcistencyException();
 			}
 		}
 	
