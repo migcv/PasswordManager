@@ -102,19 +102,6 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 			random.nextBytes(iv);
 			IvParameterSpec ivspec = new IvParameterSpec(iv);
 
-			// Sends the most recent timestamp
-			BigInteger timestamp;
-			if (timestampMap == null) {
-				timestampMap = new HashMap<Key, BigInteger>();
-			}
-			if (timestampMap.get(publicKey) == null) {
-				timestamp = BigInteger.ZERO;
-				timestampMap.put(publicKey, timestamp);
-			} else {
-				timestamp = timestampMap.get(publicKey);
-			}
-			byte[] timestampBytes = timestamp.toByteArray();
-
 			// Cipher the nounce and the id with the Session Key
 			cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
 			cipher.init(Cipher.ENCRYPT_MODE, ss.getSessionKey(), ivspec);
@@ -193,8 +180,6 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 
 			publicKeyMap.put(publicKey, new ArrayList<Triplet>());
 
-			Thread.sleep(5000);
-
 		} catch (InvalidKeyException e) {
 			e.printStackTrace();
 		} catch (NoSuchAlgorithmException e) {
@@ -207,28 +192,25 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 			e.printStackTrace();
 		} catch (BadPaddingException e) {
 			e.printStackTrace();
-		} catch (InterruptedException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
 		}
 
 	}
 
-	public void put(Key publicKey, byte[] id, byte[] domain, byte[] username, byte[] password, byte[] timestamp,
+	public ArrayList<byte[]> put(Key publicKey, byte[] id, byte[] read_id, byte[] domain, byte[] username, byte[] password, byte[] timestamp,
 			byte[] write_rank, byte[] valueSignature, byte[] iv, byte[] nonce, byte[] signature)
 			throws RemoteException, PublicKeyDoesntExistException, SignatureWrongException {
 
 		System.out.println(port + " > Received Resquest <Put>");
 
 		// Verify Signature
-		if (!utl.verifySignature(publicKey, signature, id, domain, username, password, timestamp, write_rank,
+		if (!utl.verifySignature(publicKey, signature, id, read_id, domain, username, password, timestamp, write_rank,
 				valueSignature, iv, nonce)) {
 			System.out.println(port + " > Signature NOT valid!");
 			throw new SignatureWrongException();
 		}
 
 		byte[] domainDeciphered = null, usernameDeciphered = null, passwordDeciphered = null, nounceDeciphered = null,
-				idDeciphered = null, timestampDeciphered = null, writeRankDeciphered = null;
+				idDeciphered = null, timestampDeciphered = null, writeRankDeciphered = null, readIDDeciphered = null;
 
 		// Decipher content
 		try {
@@ -252,6 +234,7 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 			nounceDeciphered = decipher.doFinal(nonce);
 			timestampDeciphered = decipher.doFinal(timestamp);
 			writeRankDeciphered = decipher.doFinal(write_rank);
+			readIDDeciphered = decipher.doFinal(read_id);
 
 			BigInteger wr = new BigInteger(writeRankDeciphered);
 
@@ -274,8 +257,8 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 			}
 
 			BigInteger wtimestamp = new BigInteger(timestampDeciphered);
-
-			if (wtimestamp.compareTo(timestampMap.get(publicKey)) < 0) {
+			
+			if (timestampMap.get(publicKey) != null && wtimestamp.compareTo(timestampMap.get(publicKey)) < 0) {
 				System.out.println(port + " > Timestamp NOT valid!");
 				throw new InvalidTimestampException();
 			}
@@ -291,8 +274,9 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 					BigInteger writeRank = new BigInteger(tripletList.get(i).getWriteRank());
 
 					if (wtimestamp.compareTo(timestampMap.get(publicKey)) == 0 && wr.compareTo(writeRank) < 0) {
+						ss.setNounce(ss.getNounce().shiftLeft(2));
 						System.out.println(port + " > Timestamp EQUAL, rank is LOWER, NO WRITE");
-						return;
+						return null;
 					}
 
 					SecureRandom random = new SecureRandom();
@@ -332,6 +316,30 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 			publicKeyMap.put(publicKey, tripletList);
 
 			saveState();
+			
+			byte[] readIDCiphered = null, nounceCiphered = null;
+			
+			SecureRandom random = new SecureRandom();
+			byte[] res_iv = new byte[16];
+			random.nextBytes(iv);
+			ivspec = new IvParameterSpec(res_iv);
+			
+			Cipher simetricCipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+			simetricCipher.init(Cipher.ENCRYPT_MODE, ss.getSessionKey(), ivspec);
+			
+			ss.setNounce(ss.getNounce().shiftLeft(2));
+
+			readIDCiphered = simetricCipher.doFinal(readIDDeciphered);
+			nounceCiphered = simetricCipher.doFinal(ss.getNounce().toByteArray());
+			
+			byte[] signatureToSend = sign(readIDCiphered, nounceCiphered, res_iv);
+			
+			ArrayList<byte[]> res = new ArrayList<byte[]>();
+			res.add(readIDCiphered);
+			res.add(nounceCiphered);
+			res.add(res_iv);
+			res.add(signatureToSend);
+			return res;
 
 		} catch (IllegalBlockSizeException e) {
 			e.printStackTrace();
@@ -345,7 +353,10 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 			e.printStackTrace();
 		} catch (NoSuchPaddingException e) {
 			e.printStackTrace();
+		} catch (SignatureException e) {
+			e.printStackTrace();
 		}
+		return null;
 	}
 
 	public ArrayList<byte[]> get(Key publicKey, byte[] user_id, byte[] read_id, byte[] domain, byte[] username,

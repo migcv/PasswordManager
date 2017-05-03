@@ -20,7 +20,9 @@ public class Library {
 
 	protected static final int F = 1;
 	
-	protected static int N_SERVERS;
+	protected static int N_SERVERS = F * 3 + 1;
+	
+	protected static int MAJORITY = (int) Math.round((double) (N_SERVERS + F) / 2);
 	
 	protected static final int PORT = 10000;
 
@@ -34,14 +36,12 @@ public class Library {
 	private BigInteger timestamp;
 
 	public Library() {
-		N_SERVERS = F * 3 + 1;
-		
 		for (int i = 0; i < N_SERVERS; i++) {
 			Thread td = new Thread(new LibraryThread(PORT + i, this), Integer.toString(PORT + i));
 			td.start();
 			threadArray.add(td);
 		}
-
+		System.out.println("Majority is " + MAJORITY);
 	}
 
 	public void init(char[] password, String alias, KeyStore ks) {
@@ -49,7 +49,7 @@ public class Library {
 		requestID++;
 		System.out.println("init: " + requestID);
 		request.put(requestID, new Object[] { requestID, "init", password, alias, ks });
-		while(response.size() < (N_SERVERS + F) / 2);
+		while(response.size() < MAJORITY);
 	}
 
 	public void register_user() {
@@ -57,7 +57,7 @@ public class Library {
 		requestID++;
 		System.out.println("register_user: " + requestID);
 		request.put(requestID, new Object[] { requestID, "register_user" });
-		while (response.size() < (N_SERVERS + F) / 2);
+		while (response.size() < MAJORITY);
 	}
 
 	public void save_password(byte[] domain, byte[] username, byte[] password) {
@@ -70,7 +70,7 @@ public class Library {
 		requestID++;
 		
 		request.put(requestID, new Object[] { requestID, "retrieve_password", domain, username });
-		while (response.size() < (N_SERVERS + F) / 2);
+		while (response.size() < MAJORITY);
 
 		HashMap<Object, Integer> majority = new HashMap<Object, Integer>();
 		for (Object values : response.values()) {
@@ -91,7 +91,7 @@ public class Library {
 			}
 		}
 	
-		if(total < (N_SERVERS + F) / 2) {
+		if(total < MAJORITY) {
 			throw new InconcistencyException();
 		}
 		
@@ -113,7 +113,7 @@ public class Library {
 		requestID++;
 		timestamp = new BigInteger(pw_ts[1]).add(BigInteger.ONE);
 		request.put(requestID, new Object[] { requestID, "save_password", domain, username, password, timestamp.toByteArray() });
-		while (response.size() < (N_SERVERS + F) / 2);
+		while (response.size() < MAJORITY);
 	}
 
 	public byte[] retrieve_password(byte[] domain, byte[] username) {
@@ -126,7 +126,7 @@ public class Library {
 		
 		request.put(requestID, new Object[] { requestID, "retrieve_password", domain, username });
 			
-		while (response.size() < (N_SERVERS + F) / 2);
+		while (response.size() < MAJORITY);
 		
 		HashMap<Object, Integer> majority = new HashMap<Object, Integer>();
 		for (Object values : response.values()) {
@@ -147,7 +147,7 @@ public class Library {
 			}
 		}
 		
-		if(total < (N_SERVERS + F) / 2) {
+		if(total < MAJORITY) {
 			throw new InconcistencyException();
 		}
 		
@@ -167,7 +167,7 @@ public class Library {
 		response = new ConcurrentHashMap<Integer, Object>();
 		requestID++;
 		request.put(requestID, new Object[] { requestID, "save_password", domain, username, pw_ts[0], pw_ts[1], pw_ts[2] });
-		while (response.size() < (N_SERVERS + F) / 2);
+		while (response.size() < MAJORITY);
 		
 		return pw_ts[0];
 	}

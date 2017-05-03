@@ -16,7 +16,6 @@ import javax.crypto.SecretKey;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
-import pm.exception.DomainOrUsernameDoesntExistException;
 import pm.exception.InconcistencyException;
 import pm.exception.InvalidNounceException;
 import pm.exception.InvalidTimestampException;
@@ -92,12 +91,16 @@ public class LibraryThread implements Serializable, Runnable {
 
 	public void init(char[] password, String alias, KeyStore ks) {
 
-		BigInteger timestamp = null;
-
 		ck = new KeyManagement();
 
 		// Initializes a connection to the Server
 		connectToServer();
+		
+		if(server == null) {
+			Thread.currentThread().interrupt();
+			System.out.println("ERROR: Connection ERROR > TERMINATING THREAD " + port);
+			return;
+		}
 
 		// Generate a new key pair
 		if (ks == null) {
@@ -295,13 +298,61 @@ public class LibraryThread implements Serializable, Runnable {
 
 			// Signature of all data [ E(userID), E(H(domain)), E(H(username)),
 			// E(E(password)) & IV ]
-			byte[] signature = ck.signature(userIDCiphered, domainCiphered, usernameCiphered, passCiphered,
+			byte[] signature = ck.signature(userIDCiphered, readIDCiphered, domainCiphered, usernameCiphered, passCiphered,
 					timestampCiphered, writeRankCiphered, valueSignature, iv, nounceCiphered);
 
 			// Data sending ==> [ CKpub, User_ID, E(H(domain)), E(H(username)),
 			// E(E(password)), IV, signature ]
-			server.put(ck.getPublicK(), userIDCiphered, domainCiphered, usernameCiphered, passCiphered,
+			ArrayList<byte[]> data = server.put(ck.getPublicK(), userIDCiphered, readIDCiphered, domainCiphered, usernameCiphered, passCiphered,
 					timestampCiphered, writeRankCiphered, valueSignature, iv, nounceCiphered, signature);
+			// Data received ==> [  read_id, nounce, iv, signature ]
+			
+			if(data == null) {
+				nounce = nounce.shiftLeft(2);
+				System.out.println(port + " <save_password> Domain or Username Doesnt Exist!");
+				return;
+			}
+
+			// Verifies Signature - verifySignature(public_key, signature,
+			// password, nonce, iv)
+			if (!ck.verifySignature(serverKey, data.get(3), data.get(0), data.get(1), data.get(2))) {
+				throw new SignatureWrongException();
+			}
+
+			// Extracting ReadID
+			byte[] readIDCipher = data.get(0);
+			
+			// Extracting nounce
+			byte[] nounceEncryp = data.get(1);
+
+			// Extracting IV
+			iv = data.get(2);
+			ivspec = new IvParameterSpec(iv);
+
+			// Decipher password with Session Key
+
+			// COM CBC
+			Cipher simetricDecipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+			simetricDecipher.init(Cipher.DECRYPT_MODE, sessionKey, ivspec);
+
+			byte[] readIDDeciphered = simetricDecipher.doFinal(readIDCipher);
+			byte[] nounceDeciphered = simetricDecipher.doFinal(nounceEncryp);
+			
+			// Verify nounce
+			BigInteger bg = new BigInteger(nounceDeciphered);
+
+			// Check nonce
+			if (!bg.equals(nounce.shiftLeft(2))) {
+				throw new InvalidNounceException();
+			}
+
+			nounce = bg;
+
+			BigInteger rid = new BigInteger(readIDDeciphered);
+
+			if (readID.compareTo(rid) != 0) {
+				throw new InconcistencyException();
+			}
 
 		} catch (RemoteException e) {
 			Thread.currentThread().interrupt();
@@ -377,7 +428,7 @@ public class LibraryThread implements Serializable, Runnable {
 			
 			if(data == null) {
 				nounce = nounce.shiftLeft(2);
-				System.out.println(port + " Domain or Username Doesnt Exist!");
+				System.out.println(port + " <retrieve_password> Domain or Username Doesnt Exist!");
 				return null;
 			}
 
@@ -405,6 +456,7 @@ public class LibraryThread implements Serializable, Runnable {
 
 			// Extracting nounce
 			nounceEncryp = data.get(5);
+			
 
 			// Decipher password with Session Key
 
@@ -422,6 +474,16 @@ public class LibraryThread implements Serializable, Runnable {
 			writeRankDecipher = simetricDecipher.doFinal(writeRankCipher);
 			readIDDeciphered = simetricDecipher.doFinal(readIDCipher);
 			nounceDeciphered = simetricDecipher.doFinal(nounceEncryp);
+			
+			// Verify nounce
+			BigInteger bg = new BigInteger(nounceDeciphered);
+
+			// Check nonce
+			if (!bg.equals(nounce.shiftLeft(2))) {
+				throw new InvalidNounceException();
+			}
+
+			nounce = nounce.shiftLeft(2);
 
 			BigInteger rid = new BigInteger(readIDDeciphered);
 
@@ -438,16 +500,6 @@ public class LibraryThread implements Serializable, Runnable {
 			Cipher assimetricDecipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
 			assimetricDecipher.init(Cipher.DECRYPT_MODE, ck.getPrivateK());
 			password = assimetricDecipher.doFinal(password_aux);
-
-			// Verify nounce
-			BigInteger bg = new BigInteger(nounceDeciphered);
-
-			// Check nonce
-			if (!bg.equals(nounce.shiftLeft(2))) {
-				throw new InvalidNounceException();
-			}
-
-			nounce = nounce.shiftLeft(2);
 
 		} catch (RemoteException e) {
 			Thread.currentThread().interrupt();
