@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
@@ -40,9 +41,9 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 	private PublicKey publicKey;
 	private PrivateKey privateKey;
 
-	private Map<Key, ArrayList<Triplet>> publicKeyMap = new HashMap<Key, ArrayList<Triplet>>();
+	private ConcurrentHashMap<Key, ArrayList<Triplet>> publicKeyMap = new ConcurrentHashMap<Key, ArrayList<Triplet>>();
 
-	private Map<BigInteger, Session> sessionKeyMap = new HashMap<BigInteger, Session>();
+	private ConcurrentHashMap<BigInteger, Session> sessionKeyMap = new ConcurrentHashMap<BigInteger, Session>();
 
 	// private Map<Key, BigInteger> timestampMap = new HashMap<Key,
 	// BigInteger>();
