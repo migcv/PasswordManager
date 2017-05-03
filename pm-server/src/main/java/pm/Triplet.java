@@ -14,8 +14,9 @@ public class Triplet implements Serializable {
 	private byte[] timestamp;
 	private ArrayList<byte[]> signturesArray = new ArrayList<byte[]>();
 	private byte[] valueSignature;
+	private byte[] writeRank;
 
-	public Triplet(byte[] domain, byte[] username, byte[] password, byte[] salt, byte[] timestamp,
+	public Triplet(byte[] domain, byte[] username, byte[] password, byte[] salt, byte[] timestamp, byte[] writeRank,
 			byte[] valueSignature, byte[] signature) {
 		this.setDomain(domain);
 		this.setUsername(username);
@@ -23,6 +24,7 @@ public class Triplet implements Serializable {
 		this.setSalt(salt);
 		this.setTimestamp(timestamp);
 		this.setValueSignature(valueSignature);
+		this.setWriteRank(writeRank);
 		addSignturesArray(signature);
 	}
 
@@ -80,6 +82,14 @@ public class Triplet implements Serializable {
 
 	public void setValueSignature(byte[] valueSignature) {
 		this.valueSignature = valueSignature;
+	}
+
+	public byte[] getWriteRank() {
+		return writeRank;
+	}
+
+	public void setWriteRank(byte[] writeRank) {
+		this.writeRank = writeRank;
 	}
 
 }

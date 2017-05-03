@@ -34,7 +34,7 @@ import pm.exception.*;
 public class Server extends UnicastRemoteObject implements ServerService, Serializable {
 
 	private static final long serialVersionUID = 1L;
-	
+
 	private int port;
 
 	private PublicKey publicKey;
@@ -50,9 +50,9 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 
 	protected Server(int port) throws RemoteException {
 		super();
-		
+
 		this.port = port;
-		
+
 		// Generate a key pair, public & private key
 		KeyPairGenerator keyGen;
 		try {
@@ -70,7 +70,7 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 	}
 
 	public ArrayList<byte[]> init(Key publicKey, byte[] sig) throws RemoteException {
-		
+
 		System.out.println(this.port + " > Received Request <Init>");
 
 		// Verify Signature
@@ -86,7 +86,7 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 		Session ss = new Session(publicKey, sessionKey, nounce);
 		sessionKeyMap.put(id, ss);
 		Cipher cipher;
-		byte[] sessionKeyCiphered = null, signature = null, nounceCiphered = null, timestampCiphered = null, iv = null,
+		byte[] sessionKeyCiphered = null, signature = null, nounceCiphered = null, iv = null,
 				idCiphered = null;
 		ArrayList<byte[]> res = new ArrayList<byte[]>();
 
@@ -104,7 +104,7 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 
 			// Sends the most recent timestamp
 			BigInteger timestamp;
-			if(timestampMap == null) {
+			if (timestampMap == null) {
 				timestampMap = new HashMap<Key, BigInteger>();
 			}
 			if (timestampMap.get(publicKey) == null) {
@@ -119,19 +119,17 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 			cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
 			cipher.init(Cipher.ENCRYPT_MODE, ss.getSessionKey(), ivspec);
 			nounceCiphered = cipher.doFinal(nounce.toByteArray());
-			timestampCiphered = cipher.doFinal(timestampBytes);
 			idCiphered = cipher.doFinal(id.toByteArray());
 
 			// Signature contaning [ Public Key, Session Key, Nonce, id, IV ]
 			// signed with Server's private key
-			signature = sign(this.publicKey.getEncoded(), sessionKeyCiphered, idCiphered, timestampCiphered,
+			signature = sign(this.publicKey.getEncoded(), sessionKeyCiphered, idCiphered,
 					nounceCiphered, iv);
 
 			// Create the array to send to the client
 			res.add(this.publicKey.getEncoded());
 			res.add(sessionKeyCiphered);
 			res.add(idCiphered);
-			res.add(timestampCiphered);
 			res.add(nounceCiphered);
 			res.add(iv);
 			res.add(signature);
@@ -158,7 +156,7 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 	public void register(Key publicKey, byte[] id, byte[] nonce, byte[] iv, byte[] signature) throws RemoteException {
 
 		System.out.println(port + " > Received Request <Register>");
-		
+
 		// Verify Signature
 		if (!utl.verifySignature(publicKey, signature, publicKey.getEncoded(), id, nonce, iv)) {
 			System.out.println(port + " > Signature NOT valid!");
@@ -217,19 +215,20 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 	}
 
 	public void put(Key publicKey, byte[] id, byte[] domain, byte[] username, byte[] password, byte[] timestamp,
-			byte[] valueSignature, byte[] iv, byte[] n, byte[] signature)
+			byte[] write_rank, byte[] valueSignature, byte[] iv, byte[] nonce, byte[] signature)
 			throws RemoteException, PublicKeyDoesntExistException, SignatureWrongException {
-		
+
 		System.out.println(port + " > Received Resquest <Put>");
 
 		// Verify Signature
-		if (!utl.verifySignature(publicKey, signature, id, domain, username, password, iv)) {
+		if (!utl.verifySignature(publicKey, signature, id, domain, username, password, timestamp, write_rank,
+				valueSignature, iv, nonce)) {
 			System.out.println(port + " > Signature NOT valid!");
 			throw new SignatureWrongException();
 		}
 
 		byte[] domainDeciphered = null, usernameDeciphered = null, passwordDeciphered = null, nounceDeciphered = null,
-				idDeciphered = null, timestampDeciphered = null;
+				idDeciphered = null, timestampDeciphered = null, writeRankDeciphered = null;
 
 		// Decipher content
 		try {
@@ -250,8 +249,11 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 			domainDeciphered = decipher.doFinal(domain);
 			usernameDeciphered = decipher.doFinal(username);
 			passwordDeciphered = decipher.doFinal(password);
-			nounceDeciphered = decipher.doFinal(n);
+			nounceDeciphered = decipher.doFinal(nonce);
 			timestampDeciphered = decipher.doFinal(timestamp);
+			writeRankDeciphered = decipher.doFinal(write_rank);
+
+			BigInteger wr = new BigInteger(writeRankDeciphered);
 
 			BigInteger bg = new BigInteger(nounceDeciphered);
 
@@ -261,6 +263,75 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 			}
 
 			ss.setNounce(bg);
+
+			boolean exists = false;
+			ArrayList<Triplet> tripletList = publicKeyMap.get(publicKey);
+
+			// Verifies if the publicKey exists
+			if (tripletList == null) {
+				System.out.println(port + " > Public Key does't exists!");
+				throw new PublicKeyDoesntExistException();
+			}
+
+			BigInteger wtimestamp = new BigInteger(timestampDeciphered);
+
+			if (wtimestamp.compareTo(timestampMap.get(publicKey)) < 0) {
+				System.out.println(port + " > Timestamp NOT valid!");
+				throw new InvalidTimestampException();
+			}
+
+			for (int i = 0; i < tripletList.size(); i++) {
+				// Verifies if the domain & username exists, if true, replace
+				// password with new one
+				if (Arrays.equals(tripletList.get(i).getDomain(),
+						utl.diggestSalt(domainDeciphered, tripletList.get(i).getSalt()))
+						&& Arrays.equals(tripletList.get(i).getUsername(),
+								utl.diggestSalt(usernameDeciphered, tripletList.get(i).getSalt()))) {
+
+					BigInteger writeRank = new BigInteger(tripletList.get(i).getWriteRank());
+
+					if (wtimestamp.compareTo(timestampMap.get(publicKey)) == 0 && wr.compareTo(writeRank) < 0) {
+						System.out.println(port + " > Timestamp EQUAL, rank is LOWER, NO WRITE");
+						return;
+					}
+
+					SecureRandom random = new SecureRandom();
+					byte[] salt = new byte[64];
+					random.nextBytes(salt);
+
+					tripletList.get(i).setDomain(utl.diggestSalt(domainDeciphered, salt));
+					tripletList.get(i).setUsername(utl.diggestSalt(usernameDeciphered, salt));
+					tripletList.get(i).setSalt(salt);
+					tripletList.get(i).setValueSignature(valueSignature);
+					tripletList.get(i).setTimestamp(timestampDeciphered);
+					tripletList.get(i).setWriteRank(userID.toByteArray());
+					tripletList.get(i).setPassword(passwordDeciphered);
+
+					timestampMap.put(publicKey, wtimestamp);
+
+					exists = true;
+					break;
+				}
+			}
+			// If domain & username doesnt exists, add new triplet (doamin,
+			// username, password)
+			if (!exists) {
+				SecureRandom random = new SecureRandom();
+				byte[] salt = new byte[64];
+				random.nextBytes(salt);
+
+				domainDeciphered = utl.diggestSalt(domainDeciphered, salt);
+				usernameDeciphered = utl.diggestSalt(usernameDeciphered, salt);
+
+				tripletList.add(new Triplet(domainDeciphered, usernameDeciphered, passwordDeciphered, salt,
+						timestampDeciphered, userID.toByteArray(), valueSignature, signature));
+
+				timestampMap.put(publicKey, wtimestamp);
+			}
+			// Put back the list of triplet in the map
+			publicKeyMap.put(publicKey, tripletList);
+
+			saveState();
 
 		} catch (IllegalBlockSizeException e) {
 			e.printStackTrace();
@@ -275,83 +346,24 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 		} catch (NoSuchPaddingException e) {
 			e.printStackTrace();
 		}
-
-		boolean exists = false;
-		ArrayList<Triplet> tripletList = publicKeyMap.get(publicKey);
-
-		// Verifies if the publicKey exists
-		if (tripletList == null) {
-			System.out.println(port + " > Public Key does't exists!");
-			throw new PublicKeyDoesntExistException();
-		}
-		
-		BigInteger wtimestamp = new BigInteger(timestampDeciphered); 
-		
-		if(wtimestamp.compareTo(timestampMap.get(publicKey)) <= 0) {
-			System.out.println(port + " > Timestamp NOT valid!");
-			throw new InvalidTimestampException();
-		}
-
-		for (int i = 0; i < tripletList.size(); i++) {
-			// Verifies if the domain & username exists, if true, replace
-			// password with new one
-			if (Arrays.equals(tripletList.get(i).getDomain(),
-					utl.diggestSalt(domainDeciphered, tripletList.get(i).getSalt()))
-					&& Arrays.equals(tripletList.get(i).getUsername(),
-							utl.diggestSalt(usernameDeciphered, tripletList.get(i).getSalt()))) {
-
-				SecureRandom random = new SecureRandom();
-				byte[] salt = new byte[64];
-				random.nextBytes(salt);
-
-				tripletList.get(i).setDomain(utl.diggestSalt(domainDeciphered, salt));
-				tripletList.get(i).setUsername(utl.diggestSalt(usernameDeciphered, salt));
-				tripletList.get(i).setSalt(salt);
-				tripletList.get(i).setValueSignature(valueSignature);
-				tripletList.get(i).setTimestamp(timestampDeciphered);
-				tripletList.get(i).setPassword(passwordDeciphered);
-				
-				timestampMap.put(publicKey, wtimestamp);
-				
-				exists = true;
-				break;
-			}
-		}
-		// If domain & username doesnt exists, add new triplet (doamin,
-		// username, password)
-		if (!exists) {
-			SecureRandom random = new SecureRandom();
-			byte[] salt = new byte[64];
-			random.nextBytes(salt);
-
-			domainDeciphered = utl.diggestSalt(domainDeciphered, salt);
-			usernameDeciphered = utl.diggestSalt(usernameDeciphered, salt);
-
-			tripletList.add(new Triplet(domainDeciphered, usernameDeciphered, passwordDeciphered, salt, timestampDeciphered,
-					valueSignature, signature));
-			
-			timestampMap.put(publicKey, wtimestamp);
-		}
-		// Put back the list of triplet in the map
-		publicKeyMap.put(publicKey, tripletList);
-
-		saveState();
 	}
 
-	public ArrayList<byte[]> get(Key publicKey, byte[] user_id, byte[] read_id, byte[] domain, byte[] username, byte[] iv, byte[] n,
-			byte[] signature) throws RemoteException, PublicKeyDoesntExistException,
+	public ArrayList<byte[]> get(Key publicKey, byte[] user_id, byte[] read_id, byte[] domain, byte[] username,
+			byte[] iv, byte[] n, byte[] signature) throws RemoteException, PublicKeyDoesntExistException,
 			DomainOrUsernameDoesntExistException, SignatureWrongException {
-		
+
 		System.out.println(port + " > Request Received <Get>");
-		
+
 		// Verify Signature
-		if (!utl.verifySignature(publicKey, signature, publicKey.getEncoded(), user_id, read_id, domain, username, n, iv)) {
+		if (!utl.verifySignature(publicKey, signature, publicKey.getEncoded(), user_id, read_id, domain, username, n,
+				iv)) {
 			System.out.println(port + " > Signature NOT valid!");
 			throw new SignatureWrongException();
 		}
 
 		byte[] domainDeciphered = null, usernameDeciphered = null, signatureToSend = null, nounceDeciphered = null,
-				idDeciphered = null, readIDDeciphered = null, timestampCiphered = null, readIDCiphered = null;
+				idDeciphered = null, readIDDeciphered = null, timestampCiphered = null, readIDCiphered = null,
+				writeRankCiphered = null;
 
 		// Decipher content
 		try {
@@ -392,7 +404,7 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 				System.out.println(port + " > Public Key doesn't exists!");
 				throw new PublicKeyDoesntExistException();
 			}
-			
+
 			for (int i = 0; i < tripletList.size(); i++) {
 				// Verifies if the domain & username exists, if true, sends
 				// password
@@ -420,31 +432,34 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 					cipher.init(Cipher.ENCRYPT_MODE, ss.getSessionKey());
 
 					passwordCiphered = cipher.doFinal(tripletList.get(i).getPassword());
+					writeRankCiphered = cipher.doFinal(tripletList.get(i).getWriteRank());
 					nounceCiphered = cipher.doFinal(ss.getNounce().toByteArray());
 					readIDCiphered = cipher.doFinal(readIDDeciphered);
-					
+
 					timestampCiphered = cipher.doFinal(tripletList.get(i).getTimestamp());
-					
+
 					byte[] valueSignature = tripletList.get(i).getValueSignature();
 
 					tripletList.get(i).addSignturesArray(signature);
 
 					// Signature contaning [ password, nonce, iv ] signed with
 					// Server's private key
-					signatureToSend = sign(passwordCiphered, timestampCiphered, valueSignature, readIDCiphered, nounceCiphered, iv);
+					signatureToSend = sign(passwordCiphered, timestampCiphered, writeRankCiphered, valueSignature,
+							readIDCiphered, nounceCiphered, iv);
 
 					// Create List to send with [ password_ciphered,
 					// iv,signature,nounce ]
 					ArrayList<byte[]> res = new ArrayList<byte[]>();
 					res.add(passwordCiphered);
 					res.add(timestampCiphered);
+					res.add(writeRankCiphered);
 					res.add(valueSignature);
 					res.add(readIDCiphered);
 					res.add(nounceCiphered);
 					res.add(iv);
 					res.add(signatureToSend);
 					return res;
-				}
+				}	
 			}
 		} catch (IllegalBlockSizeException e) {
 			e.printStackTrace();
@@ -462,7 +477,7 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 			e.printStackTrace();
 		}
 		System.out.println(port + " > Domain and/or Username doesn't exists!");
-		throw new DomainOrUsernameDoesntExistException();
+		return null;
 	}
 
 	// Function that signs data with Server's private key
