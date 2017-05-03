@@ -44,7 +44,8 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 
 	private Map<BigInteger, Session> sessionKeyMap = new HashMap<BigInteger, Session>();
 
-	private Map<Key, BigInteger> timestampMap = new HashMap<Key, BigInteger>();
+	// private Map<Key, BigInteger> timestampMap = new HashMap<Key,
+	// BigInteger>();
 
 	Utils utl = new Utils();
 
@@ -86,8 +87,7 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 		Session ss = new Session(publicKey, sessionKey, nounce);
 		sessionKeyMap.put(id, ss);
 		Cipher cipher;
-		byte[] sessionKeyCiphered = null, signature = null, nounceCiphered = null, iv = null,
-				idCiphered = null;
+		byte[] sessionKeyCiphered = null, signature = null, nounceCiphered = null, iv = null, idCiphered = null;
 		ArrayList<byte[]> res = new ArrayList<byte[]>();
 
 		try {
@@ -110,8 +110,7 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 
 			// Signature contaning [ Public Key, Session Key, Nonce, id, IV ]
 			// signed with Server's private key
-			signature = sign(this.publicKey.getEncoded(), sessionKeyCiphered, idCiphered,
-					nounceCiphered, iv);
+			signature = sign(this.publicKey.getEncoded(), sessionKeyCiphered, idCiphered, nounceCiphered, iv);
 
 			// Create the array to send to the client
 			res.add(this.publicKey.getEncoded());
@@ -196,9 +195,9 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 
 	}
 
-	public ArrayList<byte[]> put(Key publicKey, byte[] id, byte[] read_id, byte[] domain, byte[] username, byte[] password, byte[] timestamp,
-			byte[] write_rank, byte[] valueSignature, byte[] iv, byte[] nonce, byte[] signature)
-			throws RemoteException, PublicKeyDoesntExistException, SignatureWrongException {
+	public ArrayList<byte[]> put(Key publicKey, byte[] id, byte[] read_id, byte[] domain, byte[] username,
+			byte[] password, byte[] timestamp, byte[] write_rank, byte[] valueSignature, byte[] nonce, byte[] iv,
+			byte[] signature) throws RemoteException {
 
 		System.out.println(port + " > Received Resquest <Put>");
 
@@ -256,13 +255,6 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 				throw new PublicKeyDoesntExistException();
 			}
 
-			BigInteger wtimestamp = new BigInteger(timestampDeciphered);
-			
-			if (timestampMap.get(publicKey) != null && wtimestamp.compareTo(timestampMap.get(publicKey)) < 0) {
-				System.out.println(port + " > Timestamp NOT valid!");
-				throw new InvalidTimestampException();
-			}
-
 			for (int i = 0; i < tripletList.size(); i++) {
 				// Verifies if the domain & username exists, if true, replace
 				// password with new one
@@ -271,9 +263,15 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 						&& Arrays.equals(tripletList.get(i).getUsername(),
 								utl.diggestSalt(usernameDeciphered, tripletList.get(i).getSalt()))) {
 
+					BigInteger wtimestamp = new BigInteger(timestampDeciphered);
 					BigInteger writeRank = new BigInteger(tripletList.get(i).getWriteRank());
 
-					if (wtimestamp.compareTo(timestampMap.get(publicKey)) == 0 && wr.compareTo(writeRank) < 0) {
+					if (new BigInteger(tripletList.get(i).getTimestamp()).compareTo(wtimestamp) > 0) {
+						System.out.println(port + " > Timestamp NOT valid!");
+						throw new InvalidTimestampException();
+					}
+					if (new BigInteger(tripletList.get(i).getTimestamp()).compareTo(wtimestamp) == 0
+							&& wr.compareTo(writeRank) < 0) {
 						ss.setNounce(ss.getNounce().shiftLeft(2));
 						System.out.println(port + " > Timestamp EQUAL, rank is LOWER, NO WRITE");
 						return null;
@@ -291,7 +289,7 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 					tripletList.get(i).setWriteRank(userID.toByteArray());
 					tripletList.get(i).setPassword(passwordDeciphered);
 
-					timestampMap.put(publicKey, wtimestamp);
+					//timestampMap.put(publicKey, wtimestamp);
 
 					exists = true;
 					break;
@@ -310,30 +308,35 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 				tripletList.add(new Triplet(domainDeciphered, usernameDeciphered, passwordDeciphered, salt,
 						timestampDeciphered, userID.toByteArray(), valueSignature, signature));
 
-				timestampMap.put(publicKey, wtimestamp);
+				//timestampMap.put(publicKey, wtimestamp);
 			}
 			// Put back the list of triplet in the map
 			publicKeyMap.put(publicKey, tripletList);
 
-			saveState();
-			
+			/*
+			 * ANSWER res = [ read_id, nonce, iv, signature ]
+			 */
+
 			byte[] readIDCiphered = null, nounceCiphered = null;
-			
+
 			SecureRandom random = new SecureRandom();
 			byte[] res_iv = new byte[16];
 			random.nextBytes(iv);
 			ivspec = new IvParameterSpec(res_iv);
-			
+
 			Cipher simetricCipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
 			simetricCipher.init(Cipher.ENCRYPT_MODE, ss.getSessionKey(), ivspec);
-			
+
 			ss.setNounce(ss.getNounce().shiftLeft(2));
 
 			readIDCiphered = simetricCipher.doFinal(readIDDeciphered);
 			nounceCiphered = simetricCipher.doFinal(ss.getNounce().toByteArray());
-			
+
 			byte[] signatureToSend = sign(readIDCiphered, nounceCiphered, res_iv);
-			
+
+			// Refresh server state
+			saveState();
+
 			ArrayList<byte[]> res = new ArrayList<byte[]>();
 			res.add(readIDCiphered);
 			res.add(nounceCiphered);
@@ -360,14 +363,13 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 	}
 
 	public ArrayList<byte[]> get(Key publicKey, byte[] user_id, byte[] read_id, byte[] domain, byte[] username,
-			byte[] iv, byte[] n, byte[] signature) throws RemoteException, PublicKeyDoesntExistException,
-			DomainOrUsernameDoesntExistException, SignatureWrongException {
+			byte[] nonce, byte[] iv, byte[] signature) throws RemoteException {
 
 		System.out.println(port + " > Request Received <Get>");
 
 		// Verify Signature
-		if (!utl.verifySignature(publicKey, signature, publicKey.getEncoded(), user_id, read_id, domain, username, n,
-				iv)) {
+		if (!utl.verifySignature(publicKey, signature, publicKey.getEncoded(), user_id, read_id, domain, username,
+				nonce, iv)) {
 			System.out.println(port + " > Signature NOT valid!");
 			throw new SignatureWrongException();
 		}
@@ -394,7 +396,7 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 
 			domainDeciphered = decipher.doFinal(domain);
 			usernameDeciphered = decipher.doFinal(username);
-			nounceDeciphered = decipher.doFinal(n);
+			nounceDeciphered = decipher.doFinal(nonce);
 			readIDDeciphered = decipher.doFinal(read_id);
 
 			BigInteger bg = new BigInteger(nounceDeciphered);
@@ -470,7 +472,7 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 					res.add(iv);
 					res.add(signatureToSend);
 					return res;
-				}	
+				}
 			}
 		} catch (IllegalBlockSizeException e) {
 			e.printStackTrace();

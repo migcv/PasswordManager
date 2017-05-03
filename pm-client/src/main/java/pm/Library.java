@@ -13,12 +13,11 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.concurrent.ConcurrentHashMap;
 
-import pm.exception.DomainOrUsernameDoesntExistException;
 import pm.exception.InconcistencyException;
 
 public class Library {
 
-	protected static final int F = 1;
+	protected static final int F = 5;
 	
 	protected static int N_SERVERS = F * 3 + 1;
 	
@@ -27,15 +26,16 @@ public class Library {
 	protected static final int PORT = 10000;
 
 	private ArrayList<Thread> threadArray = new ArrayList<Thread>(N_SERVERS);
+	
 	private int requestID = 0;
+	
 	private ConcurrentHashMap<Integer, Object[]> request = new ConcurrentHashMap<Integer, Object[]>();
-	private boolean end = false;
-
 	private ConcurrentHashMap<Integer, Object> response;
 
-	private BigInteger timestamp;
+	private boolean end = false;
 
 	public Library() {
+		// Starts N_SERVERS Threads
 		for (int i = 0; i < N_SERVERS; i++) {
 			Thread td = new Thread(new LibraryThread(PORT + i, this), Integer.toString(PORT + i));
 			td.start();
@@ -61,16 +61,17 @@ public class Library {
 	}
 
 	public void save_password(byte[] domain, byte[] username, byte[] password) {
-		byte[][] pw_ts = null;
-		int total = 0;
-		BigInteger max_ts = BigInteger.ZERO;
+		
+		System.out.println("save_password: " + requestID);
 		
 		// Read Operation
 		response = new ConcurrentHashMap<Integer, Object>();
 		requestID++;
-		
 		request.put(requestID, new Object[] { requestID, "retrieve_password", domain, username });
 		while (response.size() < MAJORITY);
+		
+		int total = 0;
+		BigInteger max_ts = BigInteger.ZERO;
 
 		HashMap<Object, Integer> majority = new HashMap<Object, Integer>();
 		for (Object values : response.values()) {
@@ -83,11 +84,9 @@ public class Library {
 			if (majority.get(ts) > total) {
 				total = majority.get(ts);
 				max_ts = ts;
-				pw_ts = (byte[][]) values;
 			} else if(majority.get(ts) == total && max_ts.compareTo(ts) < 0) {
 				total = majority.get(ts);
 				max_ts = ts;
-				pw_ts = (byte[][]) values;
 			}
 		}
 	
@@ -111,22 +110,24 @@ public class Library {
 		// Write Operation
 		response = new ConcurrentHashMap<Integer, Object>();
 		requestID++;
-		timestamp = new BigInteger(pw_ts[1]).add(BigInteger.ONE);
-		request.put(requestID, new Object[] { requestID, "save_password", domain, username, password, timestamp.toByteArray() });
+		BigInteger ts = max_ts.add(BigInteger.ONE);
+		request.put(requestID, new Object[] { requestID, "save_password", domain, username, password, ts.toByteArray() });
 		while (response.size() < MAJORITY);
 	}
 
 	public byte[] retrieve_password(byte[] domain, byte[] username) {
+		
+		System.out.println("retrieve_password: " + requestID);
+		
+		// Read Operation
+		response = new ConcurrentHashMap<Integer, Object>();
+		requestID++;
+		request.put(requestID, new Object[] { requestID, "retrieve_password", domain, username });
+		while (response.size() < MAJORITY);
+		
 		byte[][] pw_ts = null;
 		int total = 0;
 		BigInteger max_ts = BigInteger.ZERO;
-		
-		response = new ConcurrentHashMap<Integer, Object>();
-		requestID++;
-		
-		request.put(requestID, new Object[] { requestID, "retrieve_password", domain, username });
-			
-		while (response.size() < MAJORITY);
 		
 		HashMap<Object, Integer> majority = new HashMap<Object, Integer>();
 		for (Object values : response.values()) {
@@ -164,6 +165,7 @@ public class Library {
 			}
 		}
 	
+		// Write Operation
 		response = new ConcurrentHashMap<Integer, Object>();
 		requestID++;
 		request.put(requestID, new Object[] { requestID, "save_password", domain, username, pw_ts[0], pw_ts[1], pw_ts[2] });

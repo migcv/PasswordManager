@@ -18,7 +18,6 @@ import javax.crypto.spec.SecretKeySpec;
 
 import pm.exception.InconcistencyException;
 import pm.exception.InvalidNounceException;
-import pm.exception.InvalidTimestampException;
 import pm.exception.SignatureWrongException;
 
 public class LibraryThread implements Serializable, Runnable {
@@ -62,14 +61,12 @@ public class LibraryThread implements Serializable, Runnable {
 				init((char[]) request[2], (String) request[3], (KeyStore) request[4]);
 				requestID = ((Integer) request[0]).intValue();
 				lb.addResponse(port, requestID, true);
-			} 
-			else if (request[1].equals("register_user")) {
+			} else if (request[1].equals("register_user")) {
 				register_user();
 				requestID = ((Integer) request[0]).intValue();
 				lb.addResponse(port, requestID, true);
-			} 
-			else if (request[1].equals("save_password")) {
-				if (request.length < 7) { // Default Write Ranke (UserID)
+			} else if (request[1].equals("save_password")) {
+				if (request.length < 7) { // Default Write Rank (UserID)
 					save_password((byte[]) request[2], (byte[]) request[3], (byte[]) request[4], (byte[]) request[5]);
 				} else { // Use Write Rank received
 					save_password((byte[]) request[2], (byte[]) request[3], (byte[]) request[4], (byte[]) request[5],
@@ -77,12 +74,11 @@ public class LibraryThread implements Serializable, Runnable {
 				}
 				requestID = ((Integer) request[0]).intValue();
 				lb.addResponse(port, requestID, true);
-			} 
-			else if (request[1].equals("retrieve_password")) {
+			} else if (request[1].equals("retrieve_password")) {
 				byte[][] res = retrieve_password((byte[]) request[2], (byte[]) request[3]);
 				requestID = ((Integer) request[0]).intValue();
-				if(res == null) {
-					res = new byte[][]{ "".getBytes(), BigInteger.ZERO.toByteArray(), BigInteger.ZERO.toByteArray() };
+				if (res == null) {
+					res = new byte[][] { "".getBytes(), BigInteger.ZERO.toByteArray(), BigInteger.ZERO.toByteArray() };
 				}
 				lb.addResponse(port, requestID, res);
 			}
@@ -95,8 +91,8 @@ public class LibraryThread implements Serializable, Runnable {
 
 		// Initializes a connection to the Server
 		connectToServer();
-		
-		if(server == null) {
+
+		if (server == null) {
 			Thread.currentThread().interrupt();
 			System.out.println("ERROR: Connection ERROR > TERMINATING THREAD " + port);
 			return;
@@ -124,7 +120,8 @@ public class LibraryThread implements Serializable, Runnable {
 		try {
 			// data sent ==> [ Client_Public_Key, Signature ]
 			ArrayList<byte[]> data = server.init(ck.getPublicK(), ck.signature(ck.getPublicK().getEncoded()));
-			// data received ==> [ Server_Public_Key, Session_Key, userID, Nonce, IV, Signature ]
+			// data received ==> [ Server_Public_Key, Session_Key, userID,
+			// Nonce, IV, Signature ]
 
 			// Server's public key
 			serverKey = KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(data.get(0)));
@@ -298,16 +295,17 @@ public class LibraryThread implements Serializable, Runnable {
 
 			// Signature of all data [ E(userID), E(H(domain)), E(H(username)),
 			// E(E(password)) & IV ]
-			byte[] signature = ck.signature(userIDCiphered, readIDCiphered, domainCiphered, usernameCiphered, passCiphered,
-					timestampCiphered, writeRankCiphered, valueSignature, iv, nounceCiphered);
+			byte[] signature = ck.signature(userIDCiphered, readIDCiphered, domainCiphered, usernameCiphered,
+					passCiphered, timestampCiphered, writeRankCiphered, valueSignature, iv, nounceCiphered);
 
 			// Data sending ==> [ CKpub, User_ID, E(H(domain)), E(H(username)),
 			// E(E(password)), IV, signature ]
-			ArrayList<byte[]> data = server.put(ck.getPublicK(), userIDCiphered, readIDCiphered, domainCiphered, usernameCiphered, passCiphered,
-					timestampCiphered, writeRankCiphered, valueSignature, iv, nounceCiphered, signature);
-			// Data received ==> [  read_id, nounce, iv, signature ]
-			
-			if(data == null) {
+			ArrayList<byte[]> data = server.put(ck.getPublicK(), userIDCiphered, readIDCiphered, domainCiphered,
+					usernameCiphered, passCiphered, timestampCiphered, writeRankCiphered, valueSignature, nounceCiphered,
+					iv, signature);
+			// Data received ==> [ read_id, nounce, iv, signature ]
+
+			if (data == null) {
 				nounce = nounce.shiftLeft(2);
 				System.out.println(port + " <save_password> Domain or Username Doesnt Exist!");
 				return;
@@ -321,7 +319,7 @@ public class LibraryThread implements Serializable, Runnable {
 
 			// Extracting ReadID
 			byte[] readIDCipher = data.get(0);
-			
+
 			// Extracting nounce
 			byte[] nounceEncryp = data.get(1);
 
@@ -337,7 +335,7 @@ public class LibraryThread implements Serializable, Runnable {
 
 			byte[] readIDDeciphered = simetricDecipher.doFinal(readIDCipher);
 			byte[] nounceDeciphered = simetricDecipher.doFinal(nounceEncryp);
-			
+
 			// Verify nounce
 			BigInteger bg = new BigInteger(nounceDeciphered);
 
@@ -372,8 +370,6 @@ public class LibraryThread implements Serializable, Runnable {
 			e.printStackTrace();
 		} catch (InvalidAlgorithmParameterException e) {
 			e.printStackTrace();
-		} catch (InvalidTimestampException e) {
-
 		}
 	}
 
@@ -414,19 +410,19 @@ public class LibraryThread implements Serializable, Runnable {
 			nounceEncryp = simetricCipher.doFinal(nounce.toByteArray());
 			readIDEncryp = simetricCipher.doFinal(readID.toByteArray());
 
-			// Signature of all data Public_Key, E(H(domain)), E(H(username)),
-			// E(Nonce) & IV
+			// Signature of all data [ Public_Key, E(user_id), E(read_id),
+			// E(H(domain)), E(H(username)), E(nonce), iv ]
 			byte[] signature = ck.signature(ck.getPublicK().getEncoded(), userIDCiphered, readIDEncryp, domainEncryp,
 					usernameEncryp, nounceEncryp, iv);
 
 			// Data sending ==> [ CKpub, E(user_id), E(read_id), E(H(domain)),
 			// E(H(username)), IV, E(nounce), signature ]
-			data = server.get(ck.getPublicK(), userIDCiphered, readIDEncryp, domainEncryp, usernameEncryp, iv,
-					nounceEncryp, signature);
+			data = server.get(ck.getPublicK(), userIDCiphered, readIDEncryp, domainEncryp, usernameEncryp, nounceEncryp,
+					iv, signature);
 			// Data received ==> [ password, timestamp, write_rank,
 			// valueSignature, read_id, nounce, iv, signature ]
-			
-			if(data == null) {
+
+			if (data == null) {
 				nounce = nounce.shiftLeft(2);
 				System.out.println(port + " <retrieve_password> Domain or Username Doesnt Exist!");
 				return null;
@@ -456,7 +452,6 @@ public class LibraryThread implements Serializable, Runnable {
 
 			// Extracting nounce
 			nounceEncryp = data.get(5);
-			
 
 			// Decipher password with Session Key
 
@@ -474,7 +469,7 @@ public class LibraryThread implements Serializable, Runnable {
 			writeRankDecipher = simetricDecipher.doFinal(writeRankCipher);
 			readIDDeciphered = simetricDecipher.doFinal(readIDCipher);
 			nounceDeciphered = simetricDecipher.doFinal(nounceEncryp);
-			
+
 			// Verify nounce
 			BigInteger bg = new BigInteger(nounceDeciphered);
 

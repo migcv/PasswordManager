@@ -4,7 +4,7 @@ import java.io.IOException;
 
 public class ServerMaster {
 	
-	private static final int F = 1;
+	private static final int F = 5;
 	
 	private static final int N_SERVERS = F * 3 + 1;
 	
