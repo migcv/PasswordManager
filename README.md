@@ -36,37 +36,17 @@ To run test:
   
 # Instructions using Maven — Server:
 
-To compile and copy the properties file to the output directory:
+
 ```sh
-  mvn compile
+  mvn compile package install 
 ```
 
-To create a JAR with the compiled files:
-```sh
-  mvn package
-```
+To lauch the RMI servers :
 
-To install the package into the local repository, for use as a dependency in other projects locally:
-```sh
-  mvn install
-```
-  
-To generate launch scripts for Windows and Linux:
-```sh
-  mvn package appassembler:assemble
-```
-
-
-To run RMI server using Maven appassembler plugin:
-  - On Windows:
+  - On MAC:
 
   ```sh
-      target\appassembler\bin\pm-server.bat
-  ```
-
-  - On Linux:
-
-  ```sh
-     ./target/appassembler/bin/pm-server
+     open run.scpt -- PasswordManager/pm-server
+     click in the play button
   ```
 
