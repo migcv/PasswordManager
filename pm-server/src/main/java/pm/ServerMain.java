@@ -26,9 +26,7 @@ public class ServerMain {
 			}
 			if (args.length == 2) {
 				registryPort = Integer.parseInt(args[1]);
-				if (args[0].equals("-pp")) {
-					server = new ByzantineServer(registryPort, args[1]);
-				}
+				server = new ByzantineServer(registryPort, args[0]);
 			}
 			
 			// Registry Server
