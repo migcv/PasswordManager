@@ -60,7 +60,6 @@ public class Utils implements Serializable {
 			sha.update(concat(content, salt));
 			res = sha.digest();
 		} catch (NoSuchAlgorithmException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 		return res;

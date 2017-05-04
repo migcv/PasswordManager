@@ -9,7 +9,7 @@ import javax.crypto.SecretKey;
 public class Session implements Serializable {
 
 	private static final long serialVersionUID = 1L;
-	
+
 	private Key pubKey;
 	private SecretKey sessionKey;
 	private BigInteger nounce;

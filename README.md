@@ -43,6 +43,12 @@ To run test:
 
 To lauch the RMI servers :
 
+  - On Windows:
+
+```sh
+    target\appassembler\bin\pm-server.bat 
+```
+
   - On MAC:
 
   ```sh

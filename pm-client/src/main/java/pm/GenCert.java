@@ -14,7 +14,6 @@ import java.io.FileOutputStream;
  */
 public class GenCert {
 
-
 	public X509Certificate[] generateCertificate(KeyPair pair, char[] password, String alias) throws Exception {
 
 		// JCEKS refers the KeyStore implementation from SunJCE provider
@@ -48,12 +47,12 @@ public class GenCert {
 		////////////////////////////////////////////////////////////////////////////////////////////////////
 
 		ks.setKeyEntry(alias, pair.getPrivate(), password, new java.security.cert.Certificate[] { cert });
-		
-		//Create a new file to store the KeyStore object
-		FileOutputStream fos = new FileOutputStream("keystorefile "+ alias + ".jce");
-		//Write the KeyStore into the file
+
+		// Create a new file to store the KeyStore object
+		FileOutputStream fos = new FileOutputStream("keystorefile " + alias + ".jce");
+		// Write the KeyStore into the file
 		ks.store(fos, password);
-		//Close the file stream
+		// Close the file stream
 		fos.close();
 
 		return new X509Certificate[] { cert };

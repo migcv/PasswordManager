@@ -12,7 +12,6 @@ import java.io.FileOutputStream;
  */
 public class GenCert {
 
-
 	public X509Certificate[] generateCertificate(KeyPair pair, char[] password, String alias) throws Exception {
 
 		KeyPairGenerator keyGen = KeyPairGenerator.getInstance("RSA");

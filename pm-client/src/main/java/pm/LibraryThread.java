@@ -77,6 +77,7 @@ public class LibraryThread implements Serializable, Runnable {
 			} else if (request[1].equals("retrieve_password")) {
 				byte[][] res = retrieve_password((byte[]) request[2], (byte[]) request[3]);
 				requestID = ((Integer) request[0]).intValue();
+				// the user does not exist
 				if (res == null) {
 					res = new byte[][] { "".getBytes(), BigInteger.ZERO.toByteArray(), BigInteger.ZERO.toByteArray() };
 				}
@@ -165,10 +166,6 @@ public class LibraryThread implements Serializable, Runnable {
 			// Store given nonce
 			nounce = new BigInteger(nounceDeciphered);
 
-		} catch (RemoteException e) {
-			Thread.currentThread().interrupt();
-			System.out.println("ERROR: Connection ERROR > TERMINATING THREAD " + port);
-			e.printStackTrace();
 		} catch (InvalidKeyException e) {
 			e.printStackTrace();
 		} catch (NoSuchAlgorithmException e) {
@@ -185,6 +182,9 @@ public class LibraryThread implements Serializable, Runnable {
 			e.printStackTrace();
 		} catch (SignatureException e) {
 			e.printStackTrace();
+		} catch (RemoteException e) {
+			Thread.currentThread().interrupt();
+			System.out.println("ERROR: Connection ERROR > TERMINATING THREAD " + port);
 		}
 	}
 
@@ -197,7 +197,7 @@ public class LibraryThread implements Serializable, Runnable {
 			random.nextBytes(iv);
 			IvParameterSpec ivspec = new IvParameterSpec(iv);
 
-			// Increment nounce
+			// Update the nonce value
 			nounce = nounce.shiftLeft(2);
 
 			// Cipher userID w/ server_pub_key
@@ -206,7 +206,7 @@ public class LibraryThread implements Serializable, Runnable {
 
 			final byte[] userIDCiphered = assimetricCipher.doFinal(userID.toByteArray());
 
-			// Cipher nounce w/ session_key
+			// Cipher nonce w/ session_key
 			Cipher simetricCipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
 			simetricCipher.init(Cipher.ENCRYPT_MODE, sessionKey, ivspec);
 
@@ -236,7 +236,6 @@ public class LibraryThread implements Serializable, Runnable {
 		} catch (RemoteException e) {
 			Thread.currentThread().interrupt();
 			System.out.println("ERROR: Connection ERROR > TERMINATING THREAD " + port);
-			// e.printStackTrace();
 		}
 
 	}
@@ -246,8 +245,10 @@ public class LibraryThread implements Serializable, Runnable {
 		byte[] userIDCiphered = null, passCiphered = null, domainCiphered = null, usernameCiphered = null,
 				timestampCiphered = null, readIDCiphered = null, nounceCiphered = null, writeRankCiphered = null;
 
+		// update the nonce value
 		nounce = nounce.shiftLeft(2);
 
+		// update the read ID
 		readID = readID.add(BigInteger.ONE);
 
 		try {
@@ -276,7 +277,8 @@ public class LibraryThread implements Serializable, Runnable {
 			// timestamp ]
 			byte[] valueSignature = ck.signature(domainHash, usernameHash, passCiphered, timestamp);
 
-			// Cipher domain, username, password & nounce with session key
+			// Cipher domain, username, password, timestamp, readID, writeRank &
+			// the nonce with session key
 			Cipher simetricCipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
 			simetricCipher.init(Cipher.ENCRYPT_MODE, sessionKey, ivspec);
 
@@ -287,24 +289,28 @@ public class LibraryThread implements Serializable, Runnable {
 			readIDCiphered = simetricCipher.doFinal(readID.toByteArray());
 			nounceCiphered = simetricCipher.doFinal(nounce.toByteArray());
 
+			// If the write rank does not exists it is the userID
 			if (write_rank.length == 0) {
 				writeRankCiphered = simetricCipher.doFinal(userID.toByteArray());
 			} else {
 				writeRankCiphered = simetricCipher.doFinal(write_rank[0]);
 			}
 
-			// Signature of all data [ E(userID), E(H(domain)), E(H(username)),
-			// E(E(password)) & IV ]
+			// Signature of all data [ E(userID), E(readID), E(H(domain)),
+			// E(H(username)),
+			// E(E(password)), E(timestamp), E(writeRank), Sig(values), IV &
+			// E(nounce) ]
 			byte[] signature = ck.signature(userIDCiphered, readIDCiphered, domainCiphered, usernameCiphered,
 					passCiphered, timestampCiphered, writeRankCiphered, valueSignature, iv, nounceCiphered);
 
 			// Data sending ==> [ CKpub, User_ID, E(H(domain)), E(H(username)),
-			// E(E(password)), IV, signature ]
+			// E(E(password)), E(timestamp), E(writeRank), Sig(values), IV &
+			// E(nounce), signature]
 			ArrayList<byte[]> data = server.put(ck.getPublicK(), userIDCiphered, readIDCiphered, domainCiphered,
-					usernameCiphered, passCiphered, timestampCiphered, writeRankCiphered, valueSignature, nounceCiphered,
-					iv, signature);
-			// Data received ==> [ read_id, nounce, iv, signature ]
+					usernameCiphered, passCiphered, timestampCiphered, writeRankCiphered, valueSignature,
+					nounceCiphered, iv, signature);
 
+			// Data received ==> [ read_id, nounce, iv, signature ]
 			if (data == null) {
 				nounce = nounce.shiftLeft(2);
 				System.out.println(port + " <save_password> Domain or Username Doesnt Exist!");
@@ -312,7 +318,7 @@ public class LibraryThread implements Serializable, Runnable {
 			}
 
 			// Verifies Signature - verifySignature(public_key, signature,
-			// password, nonce, iv)
+			// readID, nonce, IV)
 			if (!ck.verifySignature(serverKey, data.get(3), data.get(0), data.get(1), data.get(2))) {
 				throw new SignatureWrongException();
 			}
@@ -327,19 +333,16 @@ public class LibraryThread implements Serializable, Runnable {
 			iv = data.get(2);
 			ivspec = new IvParameterSpec(iv);
 
-			// Decipher password with Session Key
-
-			// COM CBC
+			// Decipher the readID and the nounce with Session Key
 			Cipher simetricDecipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
 			simetricDecipher.init(Cipher.DECRYPT_MODE, sessionKey, ivspec);
 
 			byte[] readIDDeciphered = simetricDecipher.doFinal(readIDCipher);
 			byte[] nounceDeciphered = simetricDecipher.doFinal(nounceEncryp);
 
-			// Verify nounce
 			BigInteger bg = new BigInteger(nounceDeciphered);
 
-			// Check nonce
+			// Verify the value of the nonce
 			if (!bg.equals(nounce.shiftLeft(2))) {
 				throw new InvalidNounceException();
 			}
@@ -352,10 +355,6 @@ public class LibraryThread implements Serializable, Runnable {
 				throw new InconcistencyException();
 			}
 
-		} catch (RemoteException e) {
-			Thread.currentThread().interrupt();
-			System.out.println("ERROR: Connection ERROR > TERMINATING THREAD " + port);
-			// e.printStackTrace();
 		} catch (InvalidKeyException e) {
 			e.printStackTrace();
 		} catch (IllegalBlockSizeException e) {
@@ -370,6 +369,9 @@ public class LibraryThread implements Serializable, Runnable {
 			e.printStackTrace();
 		} catch (InvalidAlgorithmParameterException e) {
 			e.printStackTrace();
+		} catch (RemoteException e) {
+			Thread.currentThread().interrupt();
+			System.out.println("ERROR: Connection ERROR > TERMINATING THREAD " + port);
 		}
 	}
 
@@ -378,17 +380,19 @@ public class LibraryThread implements Serializable, Runnable {
 		byte[] password = null, password_aux = null, userIDCiphered = null, domainEncryp = null, usernameEncryp = null,
 				nounceEncryp = null, readIDEncryp = null, timestampDecipher = null, readIDDeciphered = null,
 				nounceDeciphered = null, writeRankDecipher = null;
+
 		ArrayList<byte[]> data = new ArrayList<byte[]>();
 
+		// update the value of the nonce
 		nounce = nounce.shiftLeft(2);
 
+		// update the value of the readID
 		readID = readID.add(BigInteger.ONE);
 
 		try {
-			// Cipher UserID & Password with Public Key
+			// Cipher UserID with Public Key
 			Cipher assimetricCipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
 			assimetricCipher.init(Cipher.ENCRYPT_MODE, serverKey);
-
 			userIDCiphered = assimetricCipher.doFinal(userID.toByteArray());
 
 			// Generate a random IV
@@ -401,7 +405,7 @@ public class LibraryThread implements Serializable, Runnable {
 			byte[] domainHash = ck.digest(domain);
 			byte[] usernameHash = ck.digest(username);
 
-			// Cipher domain & username with session key
+			// Cipher domain, username, nonce & readID with session key
 			Cipher simetricCipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
 			simetricCipher.init(Cipher.ENCRYPT_MODE, sessionKey, ivspec);
 
@@ -416,26 +420,27 @@ public class LibraryThread implements Serializable, Runnable {
 					usernameEncryp, nounceEncryp, iv);
 
 			// Data sending ==> [ CKpub, E(user_id), E(read_id), E(H(domain)),
-			// E(H(username)), IV, E(nounce), signature ]
+			// E(H(username)), E(nounce), IV, signature ]
 			data = server.get(ck.getPublicK(), userIDCiphered, readIDEncryp, domainEncryp, usernameEncryp, nounceEncryp,
 					iv, signature);
-			// Data received ==> [ password, timestamp, write_rank,
-			// valueSignature, read_id, nounce, iv, signature ]
 
-			if (data == null) {
+			// Data received ==> [ password, timestamp,
+			// write_rank,valueSignature, read_id, nounce, iv, signature ]
+
+			if (data == null) { // If the user does not exist
 				nounce = nounce.shiftLeft(2);
 				System.out.println(port + " <retrieve_password> Domain or Username Doesnt Exist!");
 				return null;
 			}
 
-			// Verifies Signature - verifySignature(public_key, signature,
-			// password, nonce, iv)
+			// Verifies Signature - verifySignature(public_key,
+			// signature,password, timestamp, writeRank, valueSignature, readID,
+			// nonce, iv)
 			if (!ck.verifySignature(serverKey, data.get(7), data.get(0), data.get(1), data.get(2), data.get(3),
 					data.get(4), data.get(5), data.get(6))) {
 				throw new SignatureWrongException();
 			}
 
-			// Extracting IV
 			byte[] passwordCipher = data.get(0);
 
 			byte[] timestampCipher = data.get(1);
@@ -447,20 +452,11 @@ public class LibraryThread implements Serializable, Runnable {
 			byte[] readIDCipher = data.get(4);
 
 			iv = data.get(6);
-
 			ivspec = new IvParameterSpec(iv);
 
-			// Extracting nounce
 			nounceEncryp = data.get(5);
 
 			// Decipher password with Session Key
-
-			// COM CBC
-			// Cipher firstDecipher =
-			// Cipher.getInstance("AES/CBC/PKCS5Padding");
-			// firstDecipher.init(Cipher.DECRYPT_MODE, sessionKey, ivspec);
-
-			// COM ECB
 			Cipher simetricDecipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
 			simetricDecipher.init(Cipher.DECRYPT_MODE, sessionKey);
 
@@ -473,15 +469,15 @@ public class LibraryThread implements Serializable, Runnable {
 			// Verify nounce
 			BigInteger bg = new BigInteger(nounceDeciphered);
 
-			// Check nonce
 			if (!bg.equals(nounce.shiftLeft(2))) {
 				throw new InvalidNounceException();
 			}
 
+			// Update the value of the nounce
 			nounce = nounce.shiftLeft(2);
 
+			// Verify the readID
 			BigInteger rid = new BigInteger(readIDDeciphered);
-
 			if (readID.compareTo(rid) != 0) {
 				throw new InconcistencyException();
 			}
@@ -496,10 +492,6 @@ public class LibraryThread implements Serializable, Runnable {
 			assimetricDecipher.init(Cipher.DECRYPT_MODE, ck.getPrivateK());
 			password = assimetricDecipher.doFinal(password_aux);
 
-		} catch (RemoteException e) {
-			Thread.currentThread().interrupt();
-			System.out.println("ERROR: Connection ERROR > TERMINATING THREAD " + port);
-			// e.printStackTrace();
 		} catch (IllegalBlockSizeException e) {
 			e.printStackTrace();
 		} catch (BadPaddingException e) {
@@ -514,6 +506,9 @@ public class LibraryThread implements Serializable, Runnable {
 			e.printStackTrace();
 		} catch (InvalidAlgorithmParameterException e) {
 			e.printStackTrace();
+		} catch (RemoteException e) {
+			Thread.currentThread().interrupt();
+			System.out.println("ERROR: Connection ERROR > TERMINATING THREAD " + port);
 		}
 
 		return new byte[][] { password, timestampDecipher, writeRankDecipher };

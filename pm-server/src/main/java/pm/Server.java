@@ -20,8 +20,6 @@ import java.security.Signature;
 import java.security.SignatureException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import javax.crypto.BadPaddingException;
@@ -44,9 +42,6 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 	private ConcurrentHashMap<Key, ArrayList<Triplet>> publicKeyMap = new ConcurrentHashMap<Key, ArrayList<Triplet>>();
 
 	private ConcurrentHashMap<BigInteger, Session> sessionKeyMap = new ConcurrentHashMap<BigInteger, Session>();
-
-	// private Map<Key, BigInteger> timestampMap = new HashMap<Key,
-	// BigInteger>();
 
 	Utils utl = new Utils();
 
@@ -290,8 +285,6 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 					tripletList.get(i).setWriteRank(userID.toByteArray());
 					tripletList.get(i).setPassword(passwordDeciphered);
 
-					//timestampMap.put(publicKey, wtimestamp);
-
 					exists = true;
 					break;
 				}
@@ -309,7 +302,6 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 				tripletList.add(new Triplet(domainDeciphered, usernameDeciphered, passwordDeciphered, salt,
 						timestampDeciphered, userID.toByteArray(), valueSignature, signature));
 
-				//timestampMap.put(publicKey, wtimestamp);
 			}
 			// Put back the list of triplet in the map
 			publicKeyMap.put(publicKey, tripletList);
@@ -400,6 +392,7 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 			nounceDeciphered = decipher.doFinal(nonce);
 			readIDDeciphered = decipher.doFinal(read_id);
 
+			// Verifies if the nonce is valid
 			BigInteger bg = new BigInteger(nounceDeciphered);
 
 			if (!bg.equals(ss.getNounce().shiftLeft(2))) {
@@ -435,13 +428,6 @@ public class Server extends UnicastRemoteObject implements ServerService, Serial
 
 					// Cipher password with session key
 
-					// COM CBC
-					// Cipher cipher =
-					// Cipher.getInstance("AES/CBC/PKCS5Padding");
-					// cipher.init(Cipher.ENCRYPT_MODE,
-					// sessionKeyMap.get(publicKey), ivspec);
-
-					// COM ECB
 					Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
 					cipher.init(Cipher.ENCRYPT_MODE, ss.getSessionKey());
 

@@ -24,7 +24,6 @@ public class KeyManagement {
 	public void getKeys(KeyStore ks, char[] password, String alias) throws Exception {
 
 		// Get the key with the given alias.
-		// Key k = ks.getKey(alias, password);
 		publicK = ks.getCertificate(alias).getPublicKey();
 		Key k = ks.getKey(alias, password);
 		if (k instanceof PrivateKey) {

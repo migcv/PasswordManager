@@ -10,7 +10,7 @@ public class ServerMain {
 	public static void main(String[] args) {
 
 		int registryPort = Integer.parseInt(args[0]);
-		
+
 		System.setSecurityManager(new SecurityManager());
 		ServerService server = null;
 
