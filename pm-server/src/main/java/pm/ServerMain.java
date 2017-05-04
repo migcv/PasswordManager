@@ -9,7 +9,7 @@ public class ServerMain {
 
 	public static void main(String[] args) {
 
-		int registryPort = Integer.parseInt(args[0]);
+		int registryPort = 0;
 
 		System.setSecurityManager(new SecurityManager());
 		ServerService server = null;
@@ -18,9 +18,19 @@ public class ServerMain {
 		server = loadState();
 		try {
 			// If the load returned null, create new Server instance
-			if (server == null) {
-				server = new Server(registryPort);
+			if (args.length == 1) {
+				registryPort = Integer.parseInt(args[0]);
+				if (server == null) {
+					server = new Server(registryPort);
+				}
 			}
+			if (args.length == 2) {
+				registryPort = Integer.parseInt(args[1]);
+				if (args[0].equals("-pp")) {
+					server = new ByzantineServer(registryPort, args[1]);
+				}
+			}
+			
 			// Registry Server
 			Registry reg = LocateRegistry.createRegistry(registryPort);
 			reg.rebind("ServerService", server);
