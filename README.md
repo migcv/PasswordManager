@@ -57,7 +57,7 @@ To lauch the RMI servers :
   ```
 
 To run the tests with Script Editor:
-All the scripts to inject byzantine behaviour are in the folder: PasswordManager/pm-server
+    All the scripts to inject byzantine behaviour are in the folder: PasswordManager/pm-server, with the following name:
 
 ```sh
     getWrongNonce
