@@ -56,3 +56,13 @@ To lauch the RMI servers :
      click in the play button
   ```
 
+To run the tests with Script Editor:
+All the scripts to inject byzantine behaviour are in the folder: PasswordManager/pm-server
+
+```sh
+    getWrongNonce
+    getWrongWriteRank
+    putWrongPass
+    putWrongRID
+    putWrongTimeStamp
+```
